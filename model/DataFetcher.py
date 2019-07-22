@@ -12,10 +12,12 @@ import scipy.sparse as sp
 import sys
 from sklearn.preprocessing import OneHotEncoder
 import numpy as np
-
+from multiprocessing.dummy import Pool as ThreadPool
+import itertools
 
 from config import FLAGS
 from utils import sorted_nicely
+import BssGed
 
 class DataFetcher:
     """ Represents a set of data """
@@ -33,6 +35,8 @@ class DataFetcher:
         
         train_graphs = self._readGraphs(self.train_data_dir)
         test_graphs = self._readGraphs(self.test_data_dir)
+        shuffle(train_graphs)
+        shuffle(test_graphs)
         
         train_graphs, valid_graphs = self._split_train_valid(train_graphs)
         
@@ -43,6 +47,10 @@ class DataFetcher:
         self.valid_graphs = self.create_MyGraph(valid_graphs, 'valid')
         self.test_graphs = self.create_MyGraph(test_graphs, 'test')
 
+        self.cur_train_sample_ptr = 0
+        self.cur_valid_sample_ptr = 0
+        self.cur_test_sample_ptr = 0
+
     def get_train_graph_gid(self, pos):
         return self.train_graphs[pos].nxgraph.graph['gid']
 
@@ -51,7 +59,42 @@ class DataFetcher:
             raise RuntimeError('train_graphs is empty, can\'t get feature dim')
         return self.train_graphs[0].sparse_node_inputs.shape[1]
 
-    def get_data_train_and_merge(self, batchsize, max_mat_size = -1):
+    def get_data_train_in_clique(self, batchsize):
+        # get graphs
+        start = self.cur_train_sample_ptr
+        end = start + batchsize
+        if end > len(self.train_graphs):
+            end = len(self.train_graphs)
+        sample_graphs = self.train_graphs[start:end]
+        self.cur_train_sample_ptr = end
+        # set pointer to the beginning and shuffle if pointer is at end
+        if self.cur_train_sample_ptr == len(self.train_graphs):
+            shuffle(self.train_graphs)
+            self.cur_train_sample_ptr = 0
+        
+        if len(sample_graphs) < batchsize:
+            sample_graphs = sample_graphs + self.train_graphs[0:batchsize-len(sample_graphs)]
+
+        self.sample_graphs = sample_graphs
+        # Compute Label for every pair
+        self.labels = np.zeros((batchsize, batchsize))
+        pool = ThreadPool()
+        pairs = [(g1_id, g2_id) for g1_id, g2_id in itertools.product(range(batchsize), range(batchsize))]
+        pool.map(self.getLabelForPair, pairs)
+        pool.close()
+        pool.join()
+        
+        features = sp.vstack([g.sparse_node_inputs for g in sample_graphs])
+        features = self._sparse_to_tuple(features)
+        
+        laplacians = sp.block_diag([g.laplacian for g in sample_graphs])
+        laplacians = self._sparse_to_tuple(laplacians)
+        
+        sizes = [g.nxgraph.number_of_nodes() for g in sample_graphs]         
+ 
+        return features, laplacians, sizes, self.labels
+
+    def get_data_train_in_pair(self, batchsize, max_mat_size = -1):
         sample_graphs = sample(self.train_graphs, 2 * batchsize)
         
         features = sp.vstack([g.sparse_node_inputs for g in sample_graphs])
@@ -110,39 +153,7 @@ class DataFetcher:
     
     def get_test_graphs_num(self):
         return len(self.test_graphs)
-    """
-    def get_data_train_in_pair(self, batchsize, max_mat_size = -1):
-        if max_mat_size == -1:
-            max_mat_size = sys.maxsize
-        
-        # Randomly sample n pairs of graphs
-        # TODO this part needs thorough consideration for good 
-        # sampling strategy
-        sample_graphs = sample(self.train_graphs, 2 * batchsize)
-        graphs_1 = sample_graphs[0:batchsize]
-        graphs_2 = sample_graphs[batchsize:]
-        # TODO Compute if they are similar
-        labels = self._get_labels(graphs_1, graphs_2)
-        
-        # stitch their laplacian matrices and features together
-        features_1 = sp.vstack([g.sparse_node_inputs for g in graphs_1])
-        features_1 = self._sparse_to_tuple(features_1)
-        
-        features_2 = sp.vstack([g.sparse_node_inputs for g in graphs_2])
-        features_2 = self._sparse_to_tuple(features_2)
-        
-        laplacians_1 = sp.block_diag([g.laplacian for g in graphs_1])
-        laplacians_1 = self._sparse_to_tuple(laplacians_1)
-        
-        laplacians_2 = sp.block_diag([g.laplacian for g in graphs_2])
-        laplacians_2 = self._sparse_to_tuple(laplacians_2)
-        
-        sizes_1 = [g.nxgraph.number_of_nodes() for g in graphs_1]
-        sizes_2 = [g.nxgraph.number_of_nodes() for g in graphs_2]
-        
-        # return laplacian matrix and feature matrix
-        return features_1, laplacians_1, sizes_1, features_2, laplacians_2, sizes_2, labels
-    """        
+    
     """ read *.gexf in graph_dir and return a list of networkx graph """
     def _readGraphs(self, graph_dir):
         graphs = []
@@ -219,13 +230,40 @@ class DataFetcher:
     def _get_labels(self, graphs_1, graphs_2):
         labels = [0 for g in graphs_1]
         for i, g_pair in enumerate(zip(graphs_1, graphs_2)):
-            #ged = graph_edit_distance(g_pair[0].nxgraph, g_pair[1].nxgraph, 
-            #                             upper_bound=FLAGS.GED_threshold,
-            #                             node_match=node_match)
-            ged = abs(len(g_pair[0].nxgraph.nodes())-len(g_pair[0].nxgraph.nodes()))
-            if ged <= FLAGS.GED_threshold:
+            g1string = self._Graph2String(g_pair[0])
+            g2string = self._Graph2String(g_pair[1])
+            ged = BssGed.getGED(FLAGS.GED_threshold, FLAGS.beam_width, g1string, g2string)
+            if ged > -1:
                 labels[i] = 1
         return labels
+
+    def getLabelForPair(self, pair):
+        id1 = pair[0]
+        id2 = pair[1]
+        g1string = self._Graph2String(self.sample_graphs[id1])
+        g2string = self._Graph2String(self.sample_graphs[id2])
+        ged = BssGed.getGED(FLAGS.GED_threshold,
+                            FLAGS.beam_width,
+                            g1string,
+                            g2string)
+        if ged > -1:
+            self.labels[id1, id2] = 1
+            self.labels[id2, id1] = 1
+
+    def _Graph2String(self, graph):
+        nxgraph = graph.nxgraph
+        string = '{:d} {:d} {:d} '.format(nxgraph.graph['gid'], 
+                                          len(nxgraph.nodes()), 
+                                          len(nxgraph.edges()))
+        nodes_string = ''
+        for n in nxgraph.nodes(data=True):
+            nodes_string = nodes_string + str(n[1]['type']) + ' '
+
+        edges_string = ''
+        for e in nxgraph.edges():
+            edges_string = edges_string + str(e[0]) + ' ' + str(e[1]) + ' '
+
+        return string + nodes_string + edges_string
             
 
 """------------------------------------------------------------------------"""
