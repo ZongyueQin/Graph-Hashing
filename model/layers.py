@@ -33,6 +33,10 @@ def dot(x, y, sparse=False):
         res = tf.matmul(x, y)
     return res
 
+def mat_vec_dot(x, y):
+    """ implement of matrix-vector multiplication, x is a matrix, y is vector"""
+    return tf.reduce_sum(tf.multiply(x, y), axis=1)
+
 
 class Layer(object):
     """Base layer class. Defines basic API for all layer objects.
@@ -194,5 +198,56 @@ class SplitAndMeanPooling(Layer):
         for features in features_list:
             # Generate a graph embedding per graphs
             graph_emb_list.append(tf.reduce_mean(features, axis=0))
+        output = tf.stack(graph_emb_list,axis=0)
+        return [output, inputs[1], inputs[2]]
+
+class SplitAndAttentionPooling(Layer):
+    def __init__(self, input_dim, 
+                 placeholders, dropout=0.,
+                 act=tf.nn.relu, bias=False,
+                 **kwargs):
+        super(SplitAndAttentionPooling, self).__init__(**kwargs)
+        
+        
+        if dropout:
+            self.dropout = placeholders['dropout']
+        else:
+            self.dropout = 0.
+
+        self.act = act
+        self.support = placeholders['support']
+        self.bias = bias
+        # the output dimension is same as input dimension
+        self.output_dim = input_dim
+        # helper variable for sparse dropout
+        self.num_features_nonzero = placeholders['num_features_nonzero']
+        
+        with tf.variable_scope(self.name + '_vars'):
+            
+            self.vars['weights'] = glorot([input_dim, input_dim],
+                                                        name='weights')
+            if self.bias:
+                self.vars['bias'] = zeros([input_dim], name='bias')
+
+        if self.logging:
+            self._log_vars()
+            
+    def _call(self, inputs):
+        features_list = tf.split(inputs[0], inputs[2])
+        graph_emb_list = []
+        for features in features_list:
+            # Generate a graph embedding per graphs
+            graph_mean = tf.reduce_mean(features, axis=0)
+            global_feat = mat_vec_dot(self.vars['weights'], graph_mean)
+            if self.bias:
+                global_feat = global_feat + self.vars['bias']
+            global_feat = tf.nn.relu(global_feat)
+            attention = self.act(mat_vec_dot(features, global_feat))
+            attention = tf.squeeze(attention)
+            graph_emb = tf.transpose(tf.multiply(attention, 
+                                                  tf.transpose(features)))
+            graph_emb = tf.reduce_sum(graph_emb, axis=0)
+            graph_emb_list.append(graph_emb)
+            
         output = tf.stack(graph_emb_list,axis=0)
         return [output, inputs[1], inputs[2]]

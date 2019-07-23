@@ -1,4 +1,4 @@
-from layers import GraphConvolution_GCN, Dense, SplitAndMeanPooling
+from layers import *
 from metrics import binary_regularizer, DSH_loss
 from models import Model
 import tensorflow as tf
@@ -52,12 +52,17 @@ class GraphHash_Naive(Model):
                                             dropout=True,
                                             logging=self.logging))
 
-        self.layers.append(SplitAndMeanPooling(logging=self.logging))
+        self.layers.append(SplitAndAttentionPooling(input_dim=FLAGS.hidden2,
+                                                    placeholders=self.placeholders,
+                                                    act=tf.nn.sigmoid,
+                                                    dropout=True,
+                                                    logging=self.logging))
         
         self.layers.append(Dense(input_dim=FLAGS.hidden2,
                                  output_dim=FLAGS.hidden3,
                                  placeholders=self.placeholders,
                                  act=tf.nn.relu,
+                                 bias=True,
                                  dropout=True,
                                  logging=self.logging))
 
@@ -65,6 +70,7 @@ class GraphHash_Naive(Model):
                                  output_dim=self.output_dim,
                                  placeholders=self.placeholders,
                                  act=lambda x: x,
+                                 bias=True,
                                  dropout=True,
                                  logging=self.logging))
 

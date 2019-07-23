@@ -2,7 +2,8 @@ from config import FLAGS
 
 def construct_feed_dict_for_train(data_fetcher, placeholders):
     feed_dict = dict()
-    features, laplacians, sizes, labels = data_fetcher.get_data_train_and_merge(FLAGS.batchsize)
+    features, laplacians, sizes, labels = \
+        data_fetcher.sample_train_data(FLAGS.batchsize)
     nfn = data_fetcher.get_node_feature_dim()
 
     feed_dict.update({placeholders['labels']: labels})
@@ -14,9 +15,10 @@ def construct_feed_dict_for_train(data_fetcher, placeholders):
     return feed_dict
 
 
-def construct_feed_dict_for_encode(data_fetcher, placeholders, idx_list):
+def construct_feed_dict_for_encode(data_fetcher, placeholders, idx_list, tvt):
     feed_dict = dict()
-    features, laplacians, sizes= data_fetcher.get_data_from_train_to_encode(idx_list)
+    features, laplacians, sizes= \
+        data_fetcher.get_data_without_label(idx_list, tvt)
     nfn = data_fetcher.get_node_feature_dim()
     feed_dict.update({placeholders['dropout']: 0})
     feed_dict.update({placeholders['features']: features})
@@ -26,9 +28,10 @@ def construct_feed_dict_for_encode(data_fetcher, placeholders, idx_list):
     return feed_dict
 
 
-def construct_feed_dict_for_query(data_fetcher, placeholders, idx_list):
+def construct_feed_dict_for_query(data_fetcher, placeholders, idx_list, tvt):
     feed_dict = dict()
-    features, laplacians, sizes= data_fetcher.get_data_from_test_to_encode(idx_list)
+    features, laplacians, sizes= data_fetcher.get_data_without_label(idx_list, 
+                                                                     tvt)
     nfn = data_fetcher.get_node_feature_dim()
     feed_dict.update({placeholders['dropout']: 0})
     feed_dict.update({placeholders['features']: features})

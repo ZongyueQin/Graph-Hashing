@@ -5,11 +5,10 @@ Created on Tue Jul 16 09:20:31 2019
 @author: Zongyue Qin
 """
 import os
-from random import shuffle, sample
+from random import shuffle, sample, randint
 from glob import glob
 import networkx as nx
 import scipy.sparse as sp
-import sys
 from sklearn.preprocessing import OneHotEncoder
 import numpy as np
 from multiprocessing.dummy import Pool as ThreadPool
@@ -19,53 +18,92 @@ import subprocess
 
 from config import FLAGS
 from utils import sorted_nicely
-import BssGed
 
 class DataFetcher:
     """ Represents a set of data """
     
     """ read training graphs and test graphs """
     def __init__(self, dataset):
+        
+        
+        # a helper object to map features to consecutive integer
+        self.type_hash={}
+        self.typeCnt = 0
+        
         self.dataset = dataset
         self.valid_percentage = FLAGS.valid_percentage
         self.node_feat_type = FLAGS.node_feat_encoder
         self.node_feat_name = FLAGS.node_feat_name
-        
+        self.node_label_name = FLAGS.node_label_name
+        # the data directory should be ../data/$dataset/train(test)
         self.data_dir = os.path.join('..','data',dataset)
         self.train_data_dir = os.path.join(self.data_dir,'train')
         self.test_data_dir = os.path.join(self.data_dir, 'test')
-        
+        # read graphs
         train_graphs = self._readGraphs(self.train_data_dir)
         test_graphs = self._readGraphs(self.test_data_dir)
-        shuffle(train_graphs)
         shuffle(test_graphs)
-        
         train_graphs, valid_graphs = self._split_train_valid(train_graphs)
         
         self.node_feat_encoder = self._create_node_feature_encoder(
             train_graphs + valid_graphs + test_graphs)
 
-        self.train_graphs = self.create_MyGraph(train_graphs, 'train')
-        self.valid_graphs = self.create_MyGraph(valid_graphs, 'valid')
-        self.test_graphs = self.create_MyGraph(test_graphs, 'test')
+        self.train_graphs = self.create_wrapper_graph(train_graphs, 'train')
+        self.valid_graphs = self.create_wrapper_graph(valid_graphs, 'valid')
+        self.test_graphs = self.create_wrapper_graph(test_graphs, 'test')
 
+        # pointers help to sample graphs
         self.cur_train_sample_ptr = 0
         self.cur_valid_sample_ptr = 0
         self.cur_test_sample_ptr = 0
 
-        self.type_hash={}
-        self.typeCnt = 0
-
+    """ return a training graph's gid """
     def get_train_graph_gid(self, pos):
         return self.train_graphs[pos].nxgraph.graph['gid']
 
+    """ return dimension of features """
     def get_node_feature_dim(self):
         if len(self.train_graphs) == 0:
             raise RuntimeError('train_graphs is empty, can\'t get feature dim')
         return self.train_graphs[0].sparse_node_inputs.shape[1]
 
-    def get_data_train_in_clique(self, batchsize):
-        # get graphs
+    
+    """ Sample training data """
+    def sample_train_data(self, batchsize):
+        k = FLAGS.k
+        """ we would First sample $batchsize graphs from train_graphs and 
+            compute label between each pair. Then for each sampled graph we 
+            randomly generate $k similar graphs as positive data. Finally we 
+            merge features and laplacian matrices of batchsize*(k+1) graphs
+            together and return feature matrix, laplacian matrix, sizes of each 
+            graph and labels of each pair of sampled graphs """
+        
+        self.sample_train_graphs_and_compute_label(batchsize)
+        
+        # generate k similar graphs for each graph in self.sample_graphs
+        generated_graphs = []
+        for g in self.sample_graphs:
+            generated_graphs = generated_graphs +\
+            self.generate_similar_graphs(g, k)
+        self.sample_graphs = self.sample_graphs + generated_graphs
+        
+        # get features of each graph and stack them to one sparse matrix
+        features = sp.vstack([g.sparse_node_inputs for g in self.sample_graphs])
+        features = self._sparse_to_tuple(features)
+        
+        # get laplacian matrix of each graph and diagnolize them into one
+        # big matrix
+        laplacians = sp.block_diag([g.laplacian for g in self.sample_graphs])
+        laplacians = self._sparse_to_tuple(laplacians)
+        
+        # get size of each graph
+        sizes = [g.nxgraph.number_of_nodes() for g in self.sample_graphs]         
+ 
+        return features, laplacians, sizes, self.labels
+            
+    """ sample train_graphs and compute label between each pair of graphs """
+    def sample_train_graphs_and_compute_label(self, batchsize):
+        # sample $batchsize graphs
         start = self.cur_train_sample_ptr
         end = start + batchsize
         if end > len(self.train_graphs):
@@ -75,57 +113,37 @@ class DataFetcher:
         # set pointer to the beginning and shuffle if pointer is at end
         if self.cur_train_sample_ptr == len(self.train_graphs):
             shuffle(self.train_graphs)
-            self.cur_train_sample_ptr = 0
-        
+            self.cur_train_sample_ptr = 0        
         if len(sample_graphs) < batchsize:
-            sample_graphs = sample_graphs + self.train_graphs[0:batchsize-len(sample_graphs)]
+            sample_graphs = sample_graphs +\
+            self.train_graphs[0:batchsize-len(sample_graphs)]
 
         self.sample_graphs = sample_graphs
-        # Compute Label for every pair
+        # Compute Label of every pair
         self.labels = np.zeros((batchsize, batchsize))
+        # compute in parallel for efficiency
         pool = ThreadPool()
         pairs = [(g1_id, g2_id) for g1_id, g2_id in itertools.product(range(batchsize), range(batchsize))]
-        pool.map(self.getLabelForPair, pairs)
+        pool.map(self.getLabelsForSampledGraphs, pairs)
         pool.close()
         pool.join()
+        return
  
-#        for g1_id, g2_id in itertools.product(range(batchsize), range(batchsize)):
-#            pair = (g1_id, g2_id)
-#            self.getLabelForPair(pair)
-        print(self.labels)
-        features = sp.vstack([g.sparse_node_inputs for g in sample_graphs])
-        features = self._sparse_to_tuple(features)
-        
-        laplacians = sp.block_diag([g.laplacian for g in sample_graphs])
-        laplacians = self._sparse_to_tuple(laplacians)
-        
-        sizes = [g.nxgraph.number_of_nodes() for g in sample_graphs]         
- 
-        return features, laplacians, sizes, self.labels
-
-    def get_data_train_in_pair(self, batchsize, max_mat_size = -1):
-        sample_graphs = sample(self.train_graphs, 2 * batchsize)
-        
-        features = sp.vstack([g.sparse_node_inputs for g in sample_graphs])
-        features = self._sparse_to_tuple(features)
-        
-        laplacians = sp.block_diag([g.laplacian for g in sample_graphs])
-        laplacians = self._sparse_to_tuple(laplacians)
-        
-        sizes = [g.nxgraph.number_of_nodes() for g in sample_graphs]
-        
-        labels = self._get_labels(sample_graphs[0:batchsize],
-                                  sample_graphs[batchsize:])
-
-        return features, laplacians, sizes, labels
-
-    def get_data_from_train_to_encode(self, idx_list = None):
+    # get certain graphs in self.training_graphs according to idx_list
+    # return their features and laplacian matrices.
+    def get_data_without_label(self, idx_list, tvt):
         graphs = []
-        if idx_list is None:
-            graphs = self.train_graphs
+        if tvt == 'train':
+            target_list = self.train_graphs
+        elif tvt == 'test':
+            target_list = self.test_graphs
+        elif tvt == 'valid':
+            target_list = self.valid_graphs
         else:
-            for idx in idx_list:
-                graphs.append(self.train_graphs[idx])
+            raise RuntimeError('unrecognized tvt label '+str(tvt))
+            
+        for idx in idx_list:
+            graphs.append(target_list[idx])
         
         features = sp.vstack([g.sparse_node_inputs for g in graphs])
         features = self._sparse_to_tuple(features)
@@ -136,26 +154,6 @@ class DataFetcher:
         sizes = [g.nxgraph.number_of_nodes() for g in graphs]
                 
         return features, laplacians, sizes
-
-
-    def get_data_from_test_to_encode(self, idx_list = None):
-        graphs = []
-        if idx_list is None:
-            graphs = self.test_graphs
-        else:
-            for idx in idx_list:
-                graphs.append(self.test_graphs[idx])
-        
-        features = sp.vstack([g.sparse_node_inputs for g in graphs])
-        features = self._sparse_to_tuple(features)
-        
-        laplacians = sp.block_diag([g.laplacian for g in graphs])
-        laplacians = self._sparse_to_tuple(laplacians)
-        
-        sizes = [g.nxgraph.number_of_nodes() for g in graphs]
-                
-        return features, laplacians, sizes
-
 
     def get_train_graphs_num(self):
         return len(self.train_graphs)
@@ -205,7 +203,8 @@ class DataFetcher:
             raise RuntimeError('Unknown node_feat_encoder {}'.format(
                 self.node_feat_encoder))
 
-    def create_MyGraph(self, graphs, tvt):
+    """ create a wrapper object (MyGraph class) for each nxgraph """
+    def create_wrapper_graph(self, graphs, tvt):
         rtn = []
         hits = [0, 0.3, 0.6, 0.9]
         cur_hit = 0
@@ -218,8 +217,8 @@ class DataFetcher:
             rtn.append(mg)
         return rtn
 
+    """Convert sparse matrix to tuple representation."""
     def _sparse_to_tuple(self, sparse_mx):
-        """Convert sparse matrix to tuple representation."""
         def to_tuple(mx):
             if not sp.isspmatrix_coo(mx):
                 mx = mx.tocoo()
@@ -236,44 +235,37 @@ class DataFetcher:
 
         return sparse_mx
 
-    def _get_labels(self, graphs_1, graphs_2):
-        labels = [0 for g in graphs_1]
-        for i, g_pair in enumerate(zip(graphs_1, graphs_2)):
-            g1string = self._Graph2String(g_pair[0])
-            g2string = self._Graph2String(g_pair[1])
-            ged = BssGed.getGED(FLAGS.GED_threshold, FLAGS.beam_width, g1string, g2string)
-            if ged > -1:
-                labels[i] = 1
-        return labels
+    def getLabelForPair(self, g1, g2):
+        g1_fname = self.writeGraph2TempFile(g1)
+        g2_fname = self.writeGraph2TempFile(g2)
 
-    def getLabelForPair(self, pair):
+        ged = subprocess.check_output(['./ged', g1_fname, '1', g2_fname, '1', 
+                                       str(FLAGS.GED_threshold),
+                                       str(FLAGS.beam_width)])
+        # remove temporary files
+        os.remove(g1_fname)
+        os.remove(g2_fname)
+        os.remove(g1_fname+'_ordered')
+        os.remove(g2_fname+'_ordered')
+
+        return int(ged)
+        
+    def getLabelsForSampledGraphs(self, pair):
         id1 = pair[0]
         id2 = pair[1]
 
         if id2 >= id1:
             return
 
-        g1_fname = self.writeGraph2File(self.sample_graphs[id1])
-        g2_fname = self.writeGraph2File(self.sample_graphs[id2])
-
-        ged = subprocess.check_output(['./ged', g1_fname, '1', g2_fname, '1', 
-                                       str(FLAGS.GED_threshold),
-                                       str(FLAGS.beam_width)])
-        ged = int(ged)
-#        ged = BssGed.getGED(FLAGS.GED_threshold,
-#                            FLAGS.beam_width,
-#                            g1_fname,
-#                            g2_fname)
+        ged = self.getLabelForPair(self.sample_graphs[id1], 
+                                   self.sample_graphs[id2])
         
         if ged > -1:
             self.labels[id1, id2] = 1
             self.labels[id2, id1] = 1
-        os.remove(g1_fname)
-        os.remove(g2_fname)
-        os.remove(g1_fname+'_ordered')
-        os.remove(g2_fname+'_ordered')
+        return
 
-    def writeGraph2File(self, graph):
+    def writeGraph2TempFile(self, graph):
         nxgraph = graph.nxgraph
         fname = 'tmpfile/'+str(time.time()) + '_'+str(nxgraph.graph['gid']) + '.tmpfile'
         f = open(fname, 'w')
@@ -284,18 +276,150 @@ class DataFetcher:
         label2node = {}
         
         for i,n in enumerate(nxgraph.nodes(data=True)):
-            if n[1]['type'] not in self.type_hash.keys():
-                self.type_hash[n[1]['type']] = self.typeCnt
+            if n[1][self.node_feat_name] not in self.type_hash.keys():
+                self.type_hash[n[1][self.node_feat_name]] = self.typeCnt
                 self.typeCnt = self.typeCnt + 1
-            label2node[n[1]['label']] = i
-            f.write(str(n[1]['type'])+'\n')
+            if self.node_label_name != 'none':
+                label2node[n[1][self.node_label_name]] = i
+            f.write(str(n[1][self.node_feat_name])+'\n')
         
         for e in nxgraph.edges():
-            f.write(str(label2node[e[0]]) + ' ' + str(label2node[e[1]]) + ' 0\n')
+            if self.node_label_name == 'none':
+                f.write(str(e[0])+' '+str(e[1])+' 0\n')                
+            else:
+                f.write(str(label2node[e[0]]) + ' ' + str(label2node[e[1]]) + ' 0\n')
 
         f.close()
         return fname
+    
+    def generate_similar_graphs(self, g, k):
+        generated_graphs = []
+        for i in range(k):
+            tmp_g = g.nxgraph.copy()
+            # sample how many edit operation to perform
+            op_num = randint(1,FLAGS.GED_threshold)
+            j = 0
+            op_cannot_be_1 = False
+            op_cannot_be_2 = False
+            while j < op_num:
+                # randomly select a operation and do it
+                # 0: change node label, 1: insert edge, 2: delete edge
+                # 3: insert node; 4: delete node
+                can_delete_node = self.has_degree_one_node(tmp_g)
+                
+                op = randint(0, 4)
+                while (can_delete_node is False and op == 4) or\
+                (op == 0 and self.node_feat_type == 'constant') or\
+                (op >= 3 and j == op_num - 1) or\
+                (op_cannot_be_1 and op == 1) or\
+                (op_cannot_be_2 and op == 2):
+                    op = randint(0, 4)
+                 
+                if op == 0:
+                    self.random_change_node_label(tmp_g)
+                    
+                elif op == 1:
+                    if not self.random_insert_edge(tmp_g):
+                        op_cannot_be_1 = True
+                        # insert edge fail, this op doesn't count
+                        j = j - 1 
+                    else:
+                        op_cannot_be_2 = True
+                        
+                elif op == 2:
+                    if not self.random_delete_edge(tmp_g):
+                        op_cannot_be_2 = True
+                        # delete fail, this op doesn't count
+                        j = j - 1
+                    else:
+                        op_cannot_be_1 = False
+                        
+                elif op == 3:
+                    self.random_insert_node(tmp_g)
+                    # insert node takes 2 ops, so add an extra one here
+                    j = j + 1
+                    op_cannot_be_1 = False
+                    
+                else:
+                    self.random_delete_node(tmp_g)
+                    # delete node takes 2 ops
+                    j = j + 1
+                    
+                    
+                j = j + 1
+                    
+            generated_graphs.append(MyGraph(tmp_g, self.node_feat_encoder))   
+
+        return generated_graphs
+    
+    def has_degree_one_node(self, g):
+        for d in g.degree().values():
+            if d == 1:
+                return True
+        return False
+
+    def random_change_node_label(self, g):
+        node = sample(g.node.keys(),1)[0]
+        old_feat = g.node[node][self.node_feat_name]
+        new_feat = old_feat
+        while new_feat == old_feat:
+            new_feat = sample(self.node_feat_encoder.feat_idx_dic.keys(), 1)[0]
+        g.node[node][self.node_feat_name] = new_feat
+        
+        return
+    
+    def random_insert_edge(self, g):
+        old_edge_num = len(g.edges())
+        n = len(g.nodes())
+        if old_edge_num >= n*(n-1)/2:
+            return False
+        
+        while len(g.edges()) == old_edge_num:
+            nodes = sample(g.node.keys(), 2)
+            g.add_edge(nodes[0], nodes[1])
             
+        return True
+    
+    def random_delete_edge(self, g):
+        e = sample(g.edges(), 1)[0]
+        g.remove_edge(*e)
+        sample_cnt = 0
+        while not nx.is_connected(g):
+            g.add_edge(*e)
+            sample_cnt = sample_cnt + 1
+            if sample_cnt > 100:
+                break
+            e = sample(g.edges(), 1)[0]
+            g.remove_edge(*e)
+        return sample_cnt <= 100
+    
+    def random_insert_node(self, g):
+        # randomly select a node to add edge to
+        node = sample(g.node.keys(),1)[0]
+        node_label = str(time.time())
+        attri = {}
+        if self.node_feat_type == 'onehot':
+            attri[self.node_feat_name] = sample(\
+                 self.node_feat_encoder.feat_idx_dic.keys(),1)[0]
+        if self.node_label_name != 'none':
+            attri[self.node_label_name] = node_label
+        g.add_node(node_label, attr_dict=attri)
+        g.add_edge(node, node_label)
+        return
+    
+    def random_delete_node(self, g):
+        # find all nodes with 0 degree
+        deg = g.degree()
+        candidate_nodes = []
+        for n in deg.keys():
+            if deg[n] == 1:
+                candidate_nodes.append(n)
+        if len(candidate_nodes) == 0:
+            raise RuntimeError('All nodes\' degree larger than 0, cannot delete')
+
+        n = sample(candidate_nodes, 1)[0]
+        g.remove_node(n)
+        return
 
 """------------------------------------------------------------------------"""
         

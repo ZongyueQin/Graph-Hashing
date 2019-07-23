@@ -27,11 +27,25 @@ def binary_regularizer(codes):
 
 def DSH_loss(codes, labels, m):
     """ make similar graphs close, dissimilar graphs distant """
-    code_1, code_2 = tf.split(codes, 2)
-    distance = tf.reduce_sum((code_1 - code_2)**2, axis=1)
-    loss = 0.5 * labels * distance + 0.5 * (1-labels) * tf.nn.relu(m-distance)
-    return tf.reduce_mean(loss)
-
+    # First split sampled data and generated data
+    bs = FLAGS.batchsize
+    k = FLAGS.k
+    A1, A2 = tf.split(codes, [bs, bs*k])
+    # Handle first part of loss
+    M1 = tf.matmul(A1, tf.transpose(A1))
+    diag = tf.squeeze(tf.matrix_diag_part(M1))
+    M2 = tf.stack([diag for i in range(bs)])
+    l2_mat = tf.matrix_band_part((M2 + tf.transpose(M2) - 2*M1), 0, -1)
+    loss_mat = labels * l2_mat + (1-labels) * tf.nn.relu(m-l2_mat)
+    loss_1 = tf.reduce_mean(loss_mat)
+    
+    # Handle second part of loss
+    A2 = tf.reshape(A2, [bs, k, -1])
+    A3 = tf.stack([A1 for i in range(k)], axis=1)
+    loss_2 = tf.reduce_mean(tf.reduce_sum((A2-A3)**2, axis=2)) 
+    
+    return loss_1 + loss_2
+    
 def pair_accuracy(codes, labels):
     pass  
     

@@ -26,10 +26,10 @@ data_fetcher = DataFetcher('PTC')
 placeholders = {
     'support': tf.sparse_placeholder(tf.float32),
     'features': tf.sparse_placeholder(tf.float32, shape=(None, data_fetcher.get_node_feature_dim())),
-    'labels': tf.placeholder(tf.float32, shape=(None)),
+    'labels': tf.placeholder(tf.float32, shape=(FLAGS.batchsize, FLAGS.batchsize)),
     'dropout': tf.placeholder_with_default(0., shape=()),
     'num_features_nonzero': tf.placeholder(tf.int32),  # helper variable for sparse dropout
-    'graph_sizes': tf.placeholder(tf.int32, shape=(2*FLAGS.batchsize))
+    'graph_sizes': tf.placeholder(tf.int32, shape=((1+FLAGS.k)*FLAGS.batchsize))
 }
 
 # Create model
@@ -81,7 +81,10 @@ for i in range(0,size, encode_batchsize):
     # To adjust to the size of placeholders, we add some graphs for padding
     while (len(idx_list) < encode_batchsize):
         idx_list.append(0)
-    feed_dict = construct_feed_dict_for_encode(data_fetcher, placeholders, idx_list)
+    feed_dict = construct_feed_dict_for_encode(data_fetcher, 
+                                               placeholders, 
+                                               idx_list,
+                                               'train')
     codes = sess.run(model.codes, feed_dict = feed_dict)
     for j, code in enumerate(codes):
         # ignore all padding graphs
@@ -108,12 +111,16 @@ for i in range(0, total_query_num, encode_batchsize):
     # To adjust to the size of placeholders, we add some graphs for padding
     while (len(idx_list) < encode_batchsize):
         idx_list.append(0)
-    feed_dict = construct_feed_dict_for_query(data_fetcher, placeholders, idx_list)
+    feed_dict = construct_feed_dict_for_query(data_fetcher, 
+                                              placeholders, 
+                                              idx_list,
+                                              'test')
     codes = sess.run(model.codes, feed_dict = feed_dict)
     for j, code in enumerate(codes):
         # ignore all padding graphs
         if i + j >= size:
             break
+
         tuple_code = tuple(code)
         similar_sets = get_similar_graphs_gid(inverted_index, tuple_code)
         # TODO compute precision of similar_sets and groud_truth sets

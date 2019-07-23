@@ -2,6 +2,7 @@ import tensorflow as tf
 # Settings
 flags = tf.app.flags
 FLAGS = flags.FLAGS
+flags.DEFINE_integer('k', 1, 'when training, we would generate k similar graphs for each one of sampled graphs')
 flags.DEFINE_integer('GED_threshold', 5, 'threshold within which 2 graphs are similar')
 flags.DEFINE_float('valid_percentage', 0.25, 'percentage of validation set')
 flags.DEFINE_string('dataset', 'cora', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
@@ -19,6 +20,7 @@ flags.DEFINE_integer('hash_code_len',6,'length of hash code')
 flags.DEFINE_integer('batchsize',5,'batch size for training')
 flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
 flags.DEFINE_string('node_feat_name','type','Name of node feature')
+flags.DEFINE_string('node_label_name', 'label', 'Name of node label, none if it\' idx')
 flags.DEFINE_string('laplacian','gcn','how to compute laplacian')
 flags.DEFINE_float('DSH_loss_m',3,'parameter m for DSH loss')
 flags.DEFINE_float('binary_regularizer_weight',0.5,'weight for binary regularizer')
