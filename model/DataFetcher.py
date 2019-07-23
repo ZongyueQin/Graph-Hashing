@@ -14,6 +14,8 @@ from sklearn.preprocessing import OneHotEncoder
 import numpy as np
 from multiprocessing.dummy import Pool as ThreadPool
 import itertools
+import time
+import subprocess
 
 from config import FLAGS
 from utils import sorted_nicely
@@ -51,6 +53,9 @@ class DataFetcher:
         self.cur_valid_sample_ptr = 0
         self.cur_test_sample_ptr = 0
 
+        self.type_hash={}
+        self.typeCnt = 0
+
     def get_train_graph_gid(self, pos):
         return self.train_graphs[pos].nxgraph.graph['gid']
 
@@ -83,7 +88,11 @@ class DataFetcher:
         pool.map(self.getLabelForPair, pairs)
         pool.close()
         pool.join()
-        
+ 
+#        for g1_id, g2_id in itertools.product(range(batchsize), range(batchsize)):
+#            pair = (g1_id, g2_id)
+#            self.getLabelForPair(pair)
+        print(self.labels)
         features = sp.vstack([g.sparse_node_inputs for g in sample_graphs])
         features = self._sparse_to_tuple(features)
         
@@ -240,30 +249,52 @@ class DataFetcher:
     def getLabelForPair(self, pair):
         id1 = pair[0]
         id2 = pair[1]
-        g1string = self._Graph2String(self.sample_graphs[id1])
-        g2string = self._Graph2String(self.sample_graphs[id2])
-        ged = BssGed.getGED(FLAGS.GED_threshold,
-                            FLAGS.beam_width,
-                            g1string,
-                            g2string)
+
+        if id2 >= id1:
+            return
+
+        g1_fname = self.writeGraph2File(self.sample_graphs[id1])
+        g2_fname = self.writeGraph2File(self.sample_graphs[id2])
+
+        ged = subprocess.check_output(['./ged', g1_fname, '1', g2_fname, '1', 
+                                       str(FLAGS.GED_threshold),
+                                       str(FLAGS.beam_width)])
+        ged = int(ged)
+#        ged = BssGed.getGED(FLAGS.GED_threshold,
+#                            FLAGS.beam_width,
+#                            g1_fname,
+#                            g2_fname)
+        
         if ged > -1:
             self.labels[id1, id2] = 1
             self.labels[id2, id1] = 1
+        os.remove(g1_fname)
+        os.remove(g2_fname)
+        os.remove(g1_fname+'_ordered')
+        os.remove(g2_fname+'_ordered')
 
-    def _Graph2String(self, graph):
+    def writeGraph2File(self, graph):
         nxgraph = graph.nxgraph
-        string = '{:d} {:d} {:d} '.format(nxgraph.graph['gid'], 
+        fname = 'tmpfile/'+str(time.time()) + '_'+str(nxgraph.graph['gid']) + '.tmpfile'
+        f = open(fname, 'w')
+        string = '{:d}\n{:d} {:d}\n'.format(nxgraph.graph['gid'], 
                                           len(nxgraph.nodes()), 
                                           len(nxgraph.edges()))
-        nodes_string = ''
-        for n in nxgraph.nodes(data=True):
-            nodes_string = nodes_string + str(n[1]['type']) + ' '
-
-        edges_string = ''
+        f.write(string)
+        label2node = {}
+        
+        for i,n in enumerate(nxgraph.nodes(data=True)):
+            if n[1]['type'] not in self.type_hash.keys():
+                self.type_hash[n[1]['type']] = self.typeCnt
+                self.typeCnt = self.typeCnt + 1
+            label2node[n[1]['label']] = i
+            f.write(str(n[1]['type'])+'\n')
+        
         for e in nxgraph.edges():
-            edges_string = edges_string + str(e[0]) + ' ' + str(e[1]) + ' '
+            f.write(str(label2node[e[0]]) + ' ' + str(label2node[e[1]]) + ' 0\n')
 
-        return string + nodes_string + edges_string
+        f.close()
+        return fname
             
 
 """------------------------------------------------------------------------"""

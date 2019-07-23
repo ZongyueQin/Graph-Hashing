@@ -2,7 +2,7 @@ import tensorflow as tf
 # Settings
 flags = tf.app.flags
 FLAGS = flags.FLAGS
-flags.DEFINE_float('GED_threshold', 5, 'threshold within which 2 graphs are similar')
+flags.DEFINE_integer('GED_threshold', 5, 'threshold within which 2 graphs are similar')
 flags.DEFINE_float('valid_percentage', 0.25, 'percentage of validation set')
 flags.DEFINE_string('dataset', 'cora', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
 flags.DEFINE_string('model', 'gcn', 'Model string.')  # 'gcn', 'gcn_cheby', 'dense'

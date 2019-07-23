@@ -1,6 +1,6 @@
 target: bitmap.o graph.o verifyGraph.o global.o treeNode.o BSED.o ged 
 CC=g++
-CFLAGS= -fPIC -O3 -std=c++0x -D_FILE_OFFSET_BITS=64 -D_LARGE_FILE 
+CFLAGS= -O3 -std=c++0x -D_FILE_OFFSET_BITS=64 -D_LARGE_FILE 
 
 ged: bitmap.o graph.o verifyGraph.o global.o treeNode.o BSED.o ged.cpp 
 	$(CC) $(CFLAGS) bitmap.o graph.o verifyGraph.o global.o treeNode.o BSED.o ged.cpp -o ged
