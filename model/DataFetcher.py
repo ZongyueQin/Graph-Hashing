@@ -306,6 +306,9 @@ class DataFetcher:
                 # 0: change node label, 1: insert edge, 2: delete edge
                 # 3: insert node; 4: delete node
                 can_delete_node = self.has_degree_one_node(tmp_g)
+                # couldn't delete edge when only one node left
+                op_cannot_be_2 = len(tmp_g.edges()) == 0
+                
                 
                 op = randint(0, 4)
                 while (can_delete_node is False and op == 4) or\

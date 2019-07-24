@@ -9,6 +9,7 @@ class GraphHash_Naive(Model):
     def __init__(self, placeholders, input_dim, **kwargs):
         super(GraphHash_Naive, self).__init__(**kwargs)
 
+        self.graph_embs = []
         self.inputs = [placeholders['features'], placeholders['support'],
                        placeholders['graph_sizes']]
         self.input_dim = input_dim
@@ -24,9 +25,10 @@ class GraphHash_Naive(Model):
 
     def _loss(self):
         # Weight decay loss
-        for layer in self.layers:
-            for var in layer.vars.values():
-                self.loss += FLAGS.weight_decay * tf.nn.l2_loss(var)
+        for layer_type in self.layers:
+            for layer in layer_type:
+                for var in layer.vars.values():
+                    self.loss += FLAGS.weight_decay * tf.nn.l2_loss(var)
 
         self.loss += DSH_loss(self.outputs[0], self.placeholders['labels'], 
                               FLAGS.DSH_loss_m)
@@ -37,7 +39,8 @@ class GraphHash_Naive(Model):
         
     def _build(self):
         
-        self.layers.append(GraphConvolution_GCN(input_dim=self.input_dim,
+        conv_layers = []
+        conv_layers.append(GraphConvolution_GCN(input_dim=self.input_dim,
                                             output_dim=FLAGS.hidden1,
                                             placeholders=self.placeholders,
                                             act=tf.nn.relu,
@@ -45,20 +48,29 @@ class GraphHash_Naive(Model):
                                             sparse_inputs=True,
                                             logging=self.logging))
 
-        self.layers.append(GraphConvolution_GCN(input_dim=FLAGS.hidden1,
+        conv_layers.append(GraphConvolution_GCN(input_dim=FLAGS.hidden1,
                                             output_dim=FLAGS.hidden2,
                                             placeholders=self.placeholders,
                                             act=tf.nn.relu,
                                             dropout=True,
                                             logging=self.logging))
 
-        self.layers.append(SplitAndAttentionPooling(input_dim=FLAGS.hidden2,
+        pool_layers = []
+        pool_layers.append(SplitAndAttentionPooling(input_dim=FLAGS.hidden1,
                                                     placeholders=self.placeholders,
                                                     act=tf.nn.sigmoid,
                                                     dropout=True,
                                                     logging=self.logging))
         
-        self.layers.append(Dense(input_dim=FLAGS.hidden2,
+        
+        pool_layers.append(SplitAndAttentionPooling(input_dim=FLAGS.hidden2,
+                                                    placeholders=self.placeholders,
+                                                    act=tf.nn.sigmoid,
+                                                    dropout=True,
+                                                    logging=self.logging))
+        
+        mlp_layers = []
+        mlp_layers.append(Dense(input_dim=FLAGS.hidden1+FLAGS.hidden2,
                                  output_dim=FLAGS.hidden3,
                                  placeholders=self.placeholders,
                                  act=tf.nn.relu,
@@ -66,11 +78,47 @@ class GraphHash_Naive(Model):
                                  dropout=True,
                                  logging=self.logging))
 
-        self.layers.append(Dense(input_dim=FLAGS.hidden3,
+        mlp_layers.append(Dense(input_dim=FLAGS.hidden3,
                                  output_dim=self.output_dim,
                                  placeholders=self.placeholders,
                                  act=lambda x: x,
                                  bias=True,
                                  dropout=True,
                                  logging=self.logging))
+
+        
+        self.layers = [conv_layers, pool_layers, mlp_layers]
+
+    def build(self):
+        """ Wrapper for _build() """
+        with tf.variable_scope(self.name):
+            self._build()
+
+        # Build layer model
+        self.activations.append(self.inputs)
+        # conv layers
+        for conv_layer, pool_layer in zip(self.layers[0], self.layers[1]):
+            hidden = conv_layer(self.activations[-1])
+            graph_emb = pool_layer(hidden)
+            self.graph_embs.append(graph_emb[0])
+            self.activations.append(hidden)
+        
+        final_graph_emb = tf.concat(self.graph_embs, axis=1)
+        self.activations.append([final_graph_emb, hidden[1], hidden[2]])
+        
+        for mlp_layer in self.layers[2]:
+            hidden = mlp_layer(self.activations[-1])
+            self.activations.append(hidden)
+            
+        self.outputs = self.activations[-1]
+
+        # Store model variables for easy access
+        variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.name)
+        self.vars = {var.name: var for var in variables}
+
+        # Build metrics
+        self._loss()
+        self._accuracy()
+
+        self.opt_op = self.optimizer.minimize(self.loss)
 
