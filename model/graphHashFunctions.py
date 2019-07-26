@@ -17,11 +17,11 @@ class GraphHash_Naive(Model):
         self.output_dim = FLAGS.hash_code_len
         self.placeholders = placeholders
 
-        self.optimizer = tf.train.AdamOptimizer(learning_rate=placeholders['learning_rate'])
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate)
 
         self.build()
         
-        self.codes = self.outputs[0] > 0
+        self.codes = self.outputs[0] > placeholders['thres']
 
     def _loss(self):
         # Weight decay loss
@@ -134,6 +134,7 @@ class GraphHash_Rank(GraphHash_Naive):
                 for var in layer.vars.values():
                     self.loss += FLAGS.weight_decay * tf.nn.l2_loss(var)
 
-        self.loss += MSE_loss(self.outputs[0], self.placeholders['labels'], 
+        self.loss += MSE_Loss(self.outputs[0], 
+                              self.placeholders['labels'], 
                               self.placeholders['generated_labels'])
-        self.loss += FLAGS.binary_regularizer_weight*binary_regularizer(self.outputs[0])
+#        self.loss += FLAGS.binary_regularizer_weight*binary_regularizer(self.outputs[0])

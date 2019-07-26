@@ -67,7 +67,7 @@ def sorted_nicely(l):
 
     return sorted(l, key=alphanum_key)
 
-def get_similar_graphs_gid(inverted_index, code):
+def get_similar_graphs_gid(inverted_index, code, thres=FLAGS.hamming_dist_thres):
     """ use bfs to find all similar codes """
     sets = []
     frontier = [(code, 0, -1)]
@@ -76,7 +76,7 @@ def get_similar_graphs_gid(inverted_index, code):
         frontier.pop(0)
         if cur_code in inverted_index.keys():
             sets = sets + inverted_index[cur_code]
-        if dist < FLAGS.hamming_dist_thres:
+        if dist < thres:
             for j in range(last_flip_pos+1, len(code)):
                 temp_code = list(cur_code)
                 temp_code[j] = bool(1-temp_code[j])
@@ -90,6 +90,7 @@ def get_top_k_similar_graphs_gid(inverted_index, code, emb, top_k):
     frontier = [(code, 0, -1)]
     cur_ged = 0
     while len(frontier) > 0:
+    #    print('t')
         cur_code, dist, last_flip_pos = frontier[0]
         frontier.pop(0)
         if dist > cur_ged and len(sets) > top_k:
@@ -105,7 +106,7 @@ def get_top_k_similar_graphs_gid(inverted_index, code, emb, top_k):
             temp_code = list(cur_code)
             temp_code[j] = bool(1-temp_code[j])
             frontier.append((tuple(temp_code), dist+1, j))
-    
+    #print('e')
     def func(x):
             dist_x = np.sum((np.array(x[1])-np.array(emb))**2)
             return dist_x

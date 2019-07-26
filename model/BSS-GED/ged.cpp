@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
 			int ged = ed.getEditDistance(q, g, bound);
 //			if(ged > -1) 
 //			{
-//				cout << "GED(" << i << "," << j << ")" << " = " << ged << endl; 
+//				cout << g.graph_id << " " << q.graph_id << " " << ged << endl; 
 //				sum++;
 //			}
 			cout << ged << endl;
