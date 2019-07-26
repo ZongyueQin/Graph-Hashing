@@ -1,5 +1,5 @@
 from layers import *
-from metrics import binary_regularizer, DSH_loss
+from metrics import *
 from models import Model
 import tensorflow as tf
 
@@ -122,3 +122,18 @@ class GraphHash_Naive(Model):
 
         self.opt_op = self.optimizer.minimize(self.loss)
 
+
+
+
+
+class GraphHash_Rank(GraphHash_Naive):
+    def _loss(self):
+        # Weight decay loss
+        for layer_type in self.layers:
+            for layer in layer_type:
+                for var in layer.vars.values():
+                    self.loss += FLAGS.weight_decay * tf.nn.l2_loss(var)
+
+        self.loss += MSE_loss(self.outputs[0], self.placeholders['labels'], 
+                              self.placeholders['generated_labels'])
+        self.loss += FLAGS.binary_regularizer_weight*binary_regularizer(self.outputs[0])

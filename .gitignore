@@ -1,4 +1,6 @@
 data/
+SavedModel/
+tmpfile/
 __pycache__/
 *.o
 *.pyc

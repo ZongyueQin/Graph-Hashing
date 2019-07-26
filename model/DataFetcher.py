@@ -82,9 +82,12 @@ class DataFetcher:
         
         # generate k similar graphs for each graph in self.sample_graphs
         generated_graphs = []
+        generated_labels = []
         for g in self.sample_graphs:
-            generated_graphs = generated_graphs +\
-            self.generate_similar_graphs(g, k)
+            graphs, labels = self.generate_similar_graphs(g, k)
+            generated_graphs = generated_graphs + graphs
+            generated_labels.append(labels)
+            
         self.sample_graphs = self.sample_graphs + generated_graphs
         
         # get features of each graph and stack them to one sparse matrix
@@ -98,9 +101,13 @@ class DataFetcher:
         
         # get size of each graph
         sizes = [g.nxgraph.number_of_nodes() for g in self.sample_graphs]         
- 
-        return features, laplacians, sizes, self.labels
-            
+        if FLAGS.label_type == 'binary':
+            return features, laplacians, sizes, self.labels
+        elif FLAGS.label_type == 'ged':
+            return features, laplacians, sizes, self.labels, generated_labels
+        else:
+            raise RuntimeError('Unrecognized label type: '+FLAGS.label_type)
+        
     """ sample train_graphs and compute label between each pair of graphs """
     def sample_train_graphs_and_compute_label(self, batchsize):
         # sample $batchsize graphs
@@ -260,9 +267,17 @@ class DataFetcher:
         ged = self.getLabelForPair(self.sample_graphs[id1], 
                                    self.sample_graphs[id2])
         
-        if ged > -1:
-            self.labels[id1, id2] = 1
-            self.labels[id2, id1] = 1
+        if FLAGS.label_type == 'binary':
+            if ged > -1:
+                self.labels[id1, id2] = 1
+                self.labels[id2, id1] = 1
+        else:
+            if ged > -1:
+                self.labels[id1, id2] = ged
+                self.labels[id2, id1] = ged
+            else:
+                self.labels[id1, id2] = FLAGS.GED_threshold
+                self.labels[id2, id1] = FLAGS.GED_threshold
         return
 
     def writeGraph2TempFile(self, graph):
@@ -294,10 +309,13 @@ class DataFetcher:
     
     def generate_similar_graphs(self, g, k):
         generated_graphs = []
+        geds = []
         for i in range(k):
             tmp_g = g.nxgraph.copy()
             # sample how many edit operation to perform
             op_num = randint(1,FLAGS.GED_threshold)
+            # though not accurate, may be good enough
+            geds.append(op_num)
             j = 0
             op_cannot_be_1 = False
             op_cannot_be_2 = False
@@ -353,7 +371,7 @@ class DataFetcher:
                     
             generated_graphs.append(MyGraph(tmp_g, self.node_feat_encoder))   
 
-        return generated_graphs
+        return generated_graphs, geds
     
     def has_degree_one_node(self, g):
         for d in g.degree().values():

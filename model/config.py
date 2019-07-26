@@ -3,7 +3,7 @@ import tensorflow as tf
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('k', 1, 'when training, we would generate k similar graphs for each one of sampled graphs')
-flags.DEFINE_integer('GED_threshold', 5, 'threshold within which 2 graphs are similar')
+flags.DEFINE_integer('GED_threshold', 8, 'threshold within which 2 graphs are similar')
 flags.DEFINE_float('valid_percentage', 0.25, 'percentage of validation set')
 flags.DEFINE_string('dataset', 'cora', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
 flags.DEFINE_string('model', 'gcn', 'Model string.')  # 'gcn', 'gcn_cheby', 'dense'
@@ -26,3 +26,7 @@ flags.DEFINE_float('DSH_loss_m',3,'parameter m for DSH loss')
 flags.DEFINE_float('binary_regularizer_weight',0.5,'weight for binary regularizer')
 flags.DEFINE_integer('hamming_dist_thres', 2, 'threshold of similar binary codes')
 flags.DEFINE_integer('beam_width', 15, 'beam width for BSS_GED')
+flags.DEFINE_string('label_type', 'ged', 'whether training label should be binary or ged')
+flags.DEFINE_float('real_data_loss_weight', 1, 'weight of real data part (loss_1) in MSE_loss')
+flags.DEFINE_float('syn_data_loss_weight', 1, 'weight of synthesized data part (loss_2) in MSE_loss')
+flags.DEFINE_integer('top_k', 10, 'how many nearest neighbors to retrieve')
