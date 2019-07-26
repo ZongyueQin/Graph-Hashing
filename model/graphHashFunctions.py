@@ -17,7 +17,7 @@ class GraphHash_Naive(Model):
         self.output_dim = FLAGS.hash_code_len
         self.placeholders = placeholders
 
-        self.optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate)
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=placeholders['learning_rate'])
 
         self.build()
         

@@ -18,7 +18,7 @@ np.random.seed(seed)
 tf.set_random_seed(seed)
 
 # Load data
-data_fetcher = DataFetcher('PTC')
+data_fetcher = DataFetcher(FLAGS.dataset)
 
 # Some preprocessing
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Jul 16 09:20:31 2019
+Created in Tue Jul 16 09:20:31 2019
 
 @author: Zongyue Qin
 """
@@ -42,6 +42,7 @@ class DataFetcher:
         # read graphs
         train_graphs = self._readGraphs(self.train_data_dir)
         test_graphs = self._readGraphs(self.test_data_dir)
+        print(len(test_graphs))
         shuffle(test_graphs)
         train_graphs, valid_graphs = self._split_train_valid(train_graphs)
         
@@ -60,6 +61,9 @@ class DataFetcher:
     """ return a training graph's gid """
     def get_train_graph_gid(self, pos):
         return self.train_graphs[pos].nxgraph.graph['gid']
+
+    def get_test_graph_gid(self, pos):
+        return self.test_graphs[pos].nxgraph.graph['gid']
 
     """ return dimension of features """
     def get_node_feature_dim(self):
@@ -172,12 +176,14 @@ class DataFetcher:
     def _readGraphs(self, graph_dir):
         graphs = []
         for file in sorted_nicely(glob(graph_dir+'/*.gexf')):
+            if len(graphs) % 1000 == 0:
+                print('finished {:d} files'.format(len(graphs)))
             gid = int(os.path.basename(file).split('.')[0])
             g = nx.read_gexf(file)
             g.graph['gid'] = gid
             graphs.append(g)
-            if not nx.is_connected(g):
-                print('{} not connected'.format(gid))
+#            if not nx.is_connected(g):
+#                print('{} not connected'.format(gid))
                 
         return graphs
     
@@ -191,8 +197,8 @@ class DataFetcher:
         valid_graphs = graphs[0:sp]
         train_graphs = graphs[sp:]
         
-        self._check_graphs_num(train_graphs, 'train')
-        self._check_graphs_num(valid_graphs, 'validation')
+#        self._check_graphs_num(train_graphs, 'train')
+#        self._check_graphs_num(valid_graphs, 'validation')
         return train_graphs, valid_graphs
 
     """ make sure the number of graphs > 2 """
@@ -296,7 +302,7 @@ class DataFetcher:
                 self.typeCnt = self.typeCnt + 1
             if self.node_label_name != 'none':
                 label2node[n[1][self.node_label_name]] = i
-            f.write(str(n[1][self.node_feat_name])+'\n')
+            f.write(str(self.type_hash[n[1][self.node_feat_name]])+'\n')
         
         for e in nxgraph.edges():
             if self.node_label_name == 'none':
@@ -405,13 +411,14 @@ class DataFetcher:
         e = sample(g.edges(), 1)[0]
         g.remove_edge(*e)
         sample_cnt = 0
+        """
         while not nx.is_connected(g):
             g.add_edge(*e)
             sample_cnt = sample_cnt + 1
             if sample_cnt > 100:
                 break
             e = sample(g.edges(), 1)[0]
-            g.remove_edge(*e)
+            g.remove_edge(*e)"""
         return sample_cnt <= 100
     
     def random_insert_node(self, g):
