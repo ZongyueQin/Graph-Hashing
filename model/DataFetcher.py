@@ -72,6 +72,8 @@ class DataFetcher:
             raise RuntimeError('train_graphs is empty, can\'t get feature dim')
         return self.train_graphs[0].sparse_node_inputs.shape[1]
 
+    def _parse_function(self, iteration):
+        return self.sample_train_data(FLAGS.batchsize)
     
     """ Sample training data """
     def sample_train_data(self, batchsize):

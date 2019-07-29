@@ -1,6 +1,26 @@
 from config import FLAGS
 import numpy as np
 
+def construct_feed_dict_prefetch(data, data_fetcher, placeholders):
+    features = data[0]
+    laplacians = data[1]
+    sizes = data[2]
+    labels = data[3]
+    if FLAGS.label_type == 'ged':
+        generated_labels = data[4]
+    nfn = data_fetcher.get_node_feature_dim()
+    feed_dict = dict()
+    feed_dict.update({placeholders['labels']: labels})
+    feed_dict.update({placeholders['dropout']: FLAGS.dropout})
+    feed_dict.update({placeholders['features']: features})
+    feed_dict.update({placeholders['support']: laplacians})
+    feed_dict.update({placeholders['num_features_nonzero']: [nfn]})
+    feed_dict.update({placeholders['graph_sizes']: sizes})
+    if FLAGS.label_type == 'ged':
+        feed_dict.update({placeholders['generated_labels']: generated_labels})
+
+    return feed_dict
+
 def construct_feed_dict_for_train(data_fetcher, placeholders):
     feed_dict = dict()
     if FLAGS.label_type == 'binary':
