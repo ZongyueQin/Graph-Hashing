@@ -13,7 +13,7 @@ from scipy.stats import spearmanr, kendalltau
 from utils import construct_feed_dict_for_train, construct_feed_dict_for_encode
 from utils import construct_feed_dict_for_query
 from utils import get_similar_graphs_gid, get_top_k_similar_graphs_gid
-from graphHashFunctions import GraphHash_Rank
+from graphHashFunctions import GraphHash_Rank_Reg
 import numpy as np
 from config import FLAGS
 from DataFetcher import DataFetcher
@@ -44,7 +44,7 @@ placeholders = {
 }
 
 # Create model
-model = GraphHash_Rank(placeholders, input_dim=data_fetcher.get_node_feature_dim(), 
+model = GraphHash_Rank_Reg(placeholders, input_dim=data_fetcher.get_node_feature_dim(), 
                         logging=True)
 
 # Initialize session
@@ -123,7 +123,6 @@ print('finish encoding, saved index to SavedModel/inverted_index_rank.pkl')
 # Compute MSE of estimated GED for training data
 MSE_train_con = 0
 MSE_train_dis = 0
-train_ged_cnt = {}
 for i in range(100):
     idx1 = randint(0, size - 1)
     idx2 = randint(0, size - 1)
@@ -131,11 +130,6 @@ for i in range(100):
         idx2 = randint(0, size - 1)
     true_ged = data_fetcher.getLabelForPair(data_fetcher.train_graphs[idx1], 
                                             data_fetcher.train_graphs[idx2])
-    if true_ged == -1:
-        true_ged = FLAGS.GED_threshold
-
-    train_ged_cnt.setdefault(true_ged, 0)
-    train_ged_cnt[true_ged] = train_ged_cnt[true_ged] + 1
     idx_list = [idx1, idx2]
     # To adjust to the size of placeholders, we add some graphs for padding
     while (len(idx_list) < encode_batchsize):
@@ -156,7 +150,6 @@ for i in range(100):
     code2 = np.array(codes[1], dtype=np.float32)
     est_ged = np.sum((code1-code2)**2)
     MSE_train_dis = MSE_train_dis + ((true_ged-est_ged)**2)/100
-print(train_ged_cnt)
 print('MSE for training (continuous) = {:f}'.format(MSE_train_con))
 print('MSE for training (discrete) = {:f}'.format(MSE_train_dis))
 
@@ -192,7 +185,6 @@ zero_cnt = [0 for i in range(t_max)]
 
 MSE_test_con = 0
 MSE_test_dis = 0
-test_ged_cnt = {}
 for i in range(0, total_query_num, encode_batchsize):
     
     end = i + encode_batchsize
@@ -237,9 +229,6 @@ for i in range(0, total_query_num, encode_batchsize):
                               feed_dict = feed_dict)
         l = 0
         for code_train, emb_train in zip(codes, embs):
-            test_ged_cnt.setdefault(true_ged[l], 0)
-            test_ged_cnt[true_ged[l]] = test_ged_cnt[true_ged[l]] + 1
-
             emb1 = np.array(emb)
             emb2 = np.array(emb_train)
             est_ged = np.sum((emb1-emb2)**2)
@@ -319,7 +308,7 @@ for i in range(0, total_query_num, encode_batchsize):
             else:
                 f1_score = 2*precision*recall/(precision+recall)
             f1_scores[t-1].append(f1_score)
-print(test_ged_cnt)
+
 print('MSE for test (continuous) = {:f}'.format(MSE_test_con))
 print('MSE for test (discrete) = {:f}'.format(MSE_test_dis))
 
@@ -338,4 +327,3 @@ for t in range(1,t_max):
     print('average f1-score = %f'%(sum(f1_scores[t-1])/len(f1_scores[t-1])))
                 
 print(ged_cnt)
-print('FLAGS.k={:d}'.format(FLAGS.k))

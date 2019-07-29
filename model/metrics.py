@@ -21,9 +21,14 @@ def masked_accuracy(preds, labels, mask):
 
 def binary_regularizer(codes):
     """ regularizer to force codes to be binary """
-    distance_to_1 = tf.abs(tf.abs(codes)-1)
-    l1_norm = tf.reduce_sum(distance_to_1, axis=1)
-    return tf.reduce_mean(l1_norm)
+#    distance_to_1 = tf.abs(tf.abs(codes)-1)
+#    l1_norm = tf.reduce_sum(distance_to_1, axis=1)
+#    return tf.reduce_mean(l1_norm)
+    closer2one = tf.sign(tf.nn.relu(codes-0.5))
+    loss_1 = tf.reduce_sum(closer2one * tf.abs(codes-1), axis=1)
+    loss_2 = tf.reduce_sum((1-closer2one)*tf.abs(codes), axis=1)
+    loss = loss_1 + loss_2
+    return tf.reduce_mean(loss)
 
 def DSH_loss(codes, labels, m):
     """ make similar graphs close, dissimilar graphs distant """
@@ -59,11 +64,13 @@ def MSE_Loss(codes, label_1, label_2):
     loss_mat_1 = tf.matrix_band_part((l2_mat_1 - label_1)**2, 0, -1)
     loss_1 = tf.reduce_mean(loss_mat_1)
     # Handle second part of loss
-    A2 = tf.reshape(A2, [bs, k, -1])
-    A3 = tf.stack([A1 for i in range(k)], axis=1)
-    l2_mat_2 = tf.reduce_sum((A2-A3)**2, axis=2) 
-    loss_mat_2 = (label_2 - l2_mat_2)**2
-    loss_2 = tf.reduce_mean(loss_mat_2)
+    loss_2 = 0
+    if k > 0:
+      A2 = tf.reshape(A2, [bs, k, -1])
+      A3 = tf.stack([A1 for i in range(k)], axis=1)
+      l2_mat_2 = tf.reduce_sum((A2-A3)**2, axis=2) 
+      loss_mat_2 = (label_2 - l2_mat_2)**2
+      loss_2 = tf.reduce_mean(loss_mat_2)
     
     return FLAGS.real_data_loss_weight * loss_1 +\
            FLAGS.syn_data_loss_weight * loss_2

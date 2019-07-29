@@ -109,7 +109,7 @@ def get_top_k_similar_graphs_gid(inverted_index, code, emb, top_k):
     #print('e')
     def func(x):
             dist_x = np.sum((np.array(x[1])-np.array(emb))**2)
-            return dist_x
+            return dist_x*10000000 + x[0]
 #            dist_y = sum((y-emb)**2)
 #            if dist_x < dist_y:
 #                return -1

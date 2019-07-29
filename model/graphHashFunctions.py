@@ -44,7 +44,7 @@ class GraphHash_Naive(Model):
                                             output_dim=FLAGS.hidden1,
                                             placeholders=self.placeholders,
                                             act=tf.nn.relu,
-                                            dropout=True,
+                                            dropout=FLAGS.dropout>0,
                                             sparse_inputs=True,
                                             logging=self.logging))
 
@@ -52,39 +52,77 @@ class GraphHash_Naive(Model):
                                             output_dim=FLAGS.hidden2,
                                             placeholders=self.placeholders,
                                             act=tf.nn.relu,
-                                            dropout=True,
+                                            dropout=FLAGS.dropout>0,
                                             logging=self.logging))
+
+        conv_layers.append(GraphConvolution_GCN(input_dim=FLAGS.hidden2,
+                                            output_dim=FLAGS.hidden3,
+                                            placeholders=self.placeholders,
+                                            act=tf.nn.relu,
+                                            dropout=FLAGS.dropout>0,
+                                            logging=self.logging))
+
+
 
         pool_layers = []
         pool_layers.append(SplitAndAttentionPooling(input_dim=FLAGS.hidden1,
                                                     placeholders=self.placeholders,
                                                     act=tf.nn.sigmoid,
-                                                    dropout=True,
+                                                    dropout=FLAGS.dropout>0,
                                                     logging=self.logging))
         
         
         pool_layers.append(SplitAndAttentionPooling(input_dim=FLAGS.hidden2,
                                                     placeholders=self.placeholders,
                                                     act=tf.nn.sigmoid,
-                                                    dropout=True,
+                                                    dropout=FLAGS.dropout>0,
                                                     logging=self.logging))
         
+
+
+        pool_layers.append(SplitAndAttentionPooling(input_dim=FLAGS.hidden3,
+                                                    placeholders=self.placeholders,
+                                                    act=tf.nn.sigmoid,
+                                                    dropout=FLAGS.dropout>0,
+                                                    logging=self.logging))
+       
+
         mlp_layers = []
-        mlp_layers.append(Dense(input_dim=FLAGS.hidden1+FLAGS.hidden2,
-                                 output_dim=FLAGS.hidden3,
+        mlp_layers.append(Dense(input_dim=FLAGS.hidden1+FLAGS.hidden2+FLAGS.hidden3,
+                                 output_dim=FLAGS.hidden4,
                                  placeholders=self.placeholders,
                                  act=tf.nn.relu,
                                  bias=True,
-                                 dropout=True,
+                                 dropout=FLAGS.dropout>0,
                                  logging=self.logging))
 
-        mlp_layers.append(Dense(input_dim=FLAGS.hidden3,
+        mlp_layers.append(Dense(input_dim=FLAGS.hidden4,
+                                 output_dim=FLAGS.hidden5,
+                                 placeholders=self.placeholders,
+                                 act=tf.nn.relu,
+                                 bias=True,
+                                 dropout=FLAGS.dropout>0,
+                                 logging=self.logging))
+
+        mlp_layers.append(Dense(input_dim=FLAGS.hidden5,
+                                 output_dim=FLAGS.hidden6,
+                                 placeholders=self.placeholders,
+                                 act=tf.nn.relu,
+                                 bias=True,
+                                 dropout=FLAGS.dropout>0,
+                                 logging=self.logging))
+
+
+
+        mlp_layers.append(Dense(input_dim=FLAGS.hidden6,
                                  output_dim=self.output_dim,
                                  placeholders=self.placeholders,
                                  act=lambda x: x,
                                  bias=True,
-                                 dropout=True,
+                                 dropout=FLAGS.dropout>0,
                                  logging=self.logging))
+
+        
 
         
         self.layers = [conv_layers, pool_layers, mlp_layers]
@@ -137,4 +175,17 @@ class GraphHash_Rank(GraphHash_Naive):
         self.loss += MSE_Loss(self.outputs[0], 
                               self.placeholders['labels'], 
                               self.placeholders['generated_labels'])
-#        self.loss += FLAGS.binary_regularizer_weight*binary_regularizer(self.outputs[0])
+
+class GraphHash_Rank_Reg(GraphHash_Naive):
+    def _loss(self):
+        # Weight decay loss
+        for layer_type in self.layers:
+            for layer in layer_type:
+                for var in layer.vars.values():
+                    self.loss += FLAGS.weight_decay * tf.nn.l2_loss(var)
+
+        self.loss += MSE_Loss(self.outputs[0], 
+                              self.placeholders['labels'], 
+                              self.placeholders['generated_labels'])
+
+        self.loss += FLAGS.binary_regularizer_weight*binary_regularizer(self.outputs[0])

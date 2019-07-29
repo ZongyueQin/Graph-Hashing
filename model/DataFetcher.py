@@ -41,8 +41,9 @@ class DataFetcher:
         self.test_data_dir = os.path.join(self.data_dir, 'test')
         # read graphs
         train_graphs = self._readGraphs(self.train_data_dir)
+#        train_graphs = train_graphs[0:FLAGS.batchsize]
+
         test_graphs = self._readGraphs(self.test_data_dir)
-        print(len(test_graphs))
         shuffle(test_graphs)
         train_graphs, valid_graphs = self._split_train_valid(train_graphs)
         
@@ -182,6 +183,8 @@ class DataFetcher:
             g = nx.read_gexf(file)
             g.graph['gid'] = gid
             graphs.append(g)
+#            if len(graphs) == FLAGS.batchsize:
+#                break
 #            if not nx.is_connected(g):
 #                print('{} not connected'.format(gid))
                 
@@ -319,7 +322,7 @@ class DataFetcher:
         for i in range(k):
             tmp_g = g.nxgraph.copy()
             # sample how many edit operation to perform
-            op_num = randint(1,FLAGS.GED_threshold)
+            op_num = randint(1,FLAGS.GED_threshold-2)
             # though not accurate, may be good enough
             geds.append(op_num)
             j = 0
