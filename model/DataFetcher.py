@@ -15,6 +15,7 @@ from multiprocessing.dummy import Pool as ThreadPool
 import itertools
 import time
 import subprocess
+import tensorflow as tf
 
 from config import FLAGS
 from utils import sorted_nicely
@@ -41,7 +42,7 @@ class DataFetcher:
         self.test_data_dir = os.path.join(self.data_dir, 'test')
         # read graphs
         train_graphs = self._readGraphs(self.train_data_dir)
-#        train_graphs = train_graphs[0:FLAGS.batchsize]
+        train_graphs = train_graphs[0:FLAGS.batchsize*(1+FLAGS.k)]
 
         test_graphs = self._readGraphs(self.test_data_dir)
         shuffle(test_graphs)
@@ -109,9 +110,12 @@ class DataFetcher:
         # get size of each graph
         sizes = [g.nxgraph.number_of_nodes() for g in self.sample_graphs]         
         if FLAGS.label_type == 'binary':
-            return features, laplacians, sizes, self.labels
+            return features, laplacians, sizes, tf.convert_to_tensor(self.labels)
         elif FLAGS.label_type == 'ged':
-            return features, laplacians, sizes, self.labels, generated_labels
+            return tf.SparseTensor(features[0], features[1], features[2]),\
+                   tf.SparseTensor(laplacians[0], laplacians[1], laplacians[2]),\
+                   tf.convert_to_tensor(sizes), tf.convert_to_tensor(self.labels),\
+                   tf.convert_to_tensor(generated_labels)
         else:
             raise RuntimeError('Unrecognized label type: '+FLAGS.label_type)
         
@@ -185,8 +189,8 @@ class DataFetcher:
             g = nx.read_gexf(file)
             g.graph['gid'] = gid
             graphs.append(g)
-#            if len(graphs) == FLAGS.batchsize:
-#                break
+            if len(graphs) == FLAGS.batchsize*(1+FLAGS.k):
+                break
 #            if not nx.is_connected(g):
 #                print('{} not connected'.format(gid))
                 

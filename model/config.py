@@ -2,13 +2,13 @@ import tensorflow as tf
 # Settings
 flags = tf.app.flags
 FLAGS = flags.FLAGS
-flags.DEFINE_integer('k', 2, 'when training, we would generate k similar graphs for each one of sampled graphs')
+flags.DEFINE_integer('k', 0, 'when training, we would generate k similar graphs for each one of sampled graphs')
 flags.DEFINE_integer('GED_threshold', 8, 'threshold within which 2 graphs are similar')
 flags.DEFINE_float('valid_percentage', 0, 'percentage of validation set')
-flags.DEFINE_string('dataset', 'PTC', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
+flags.DEFINE_string('dataset', 'AIDS', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
 flags.DEFINE_string('model', 'gcn', 'Model string.')  # 'gcn', 'gcn_cheby', 'dense'
 flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate.')
-flags.DEFINE_integer('epochs', 10, 'Number of epochs to train.')
+flags.DEFINE_integer('epochs', 1000, 'Number of epochs to train.')
 
 flags.DEFINE_integer('hidden1', 256, 'Number of units in hidden layer 1.')
 flags.DEFINE_integer('hidden2', 128, 'Number of units in hidden layer 2.')
@@ -34,7 +34,7 @@ flags.DEFINE_float('binary_regularizer_weight',0.5,'weight for binary regularize
 flags.DEFINE_integer('hamming_dist_thres', 2, 'threshold of similar binary codes')
 flags.DEFINE_integer('beam_width', 15, 'beam width for BSS_GED')
 flags.DEFINE_string('label_type', 'ged', 'whether training label should be binary or ged')
-flags.DEFINE_float('real_data_loss_weight', 0.1, 'weight of real data part (loss_1) in MSE_loss')
+flags.DEFINE_float('real_data_loss_weight', 1, 'weight of real data part (loss_1) in MSE_loss')
 flags.DEFINE_float('syn_data_loss_weight', 10, 'weight of synthesized data part (loss_2) in MSE_loss')
 flags.DEFINE_integer('top_k', 10, 'how many nearest neighbors to retrieve')
 flags.DEFINE_string('ground_truth_file', 'GT8.txt', 'ground truth file, should be in test directory')

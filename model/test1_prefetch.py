@@ -28,8 +28,8 @@ np.random.seed(seed)
 tf.set_random_seed(seed)
 
 # Load data
+dataset = tf.data.Dataset.from_tensor_slices(tf.constant(list(range(FLAGS.epochs))))
 data_fetcher = DataFetcher(FLAGS.dataset)
-dataset = tf.data.Dataset.from_tensor_slices(np.array(range(FLAGS.epochs)))
 dataset = dataset.map(data_fetcher._parse_function)
 dataset = dataset.prefetch(buffer_size=1)
 iterator = dataset.make_one_shot_iterator()
@@ -128,7 +128,7 @@ index_file = open('SavedModel/inverted_index_rank.pkl', 'wb')
 pickle.dump(inverted_index, index_file)
 index_file.close()
 print('finish encoding, saved index to SavedModel/inverted_index_rank.pkl')
-"""
+
 # Compute MSE of estimated GED for training data
 MSE_train_con = 0
 MSE_train_dis = 0
@@ -348,4 +348,4 @@ for t in range(1,t_max):
                 
 print(ged_cnt)
 print('FLAGS.k={:d}'.format(FLAGS.k))
-"""
+

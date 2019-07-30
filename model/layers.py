@@ -12,14 +12,14 @@ def get_layer_uid(layer_name=''):
         _LAYER_UIDS[layer_name] = 1
         return 1
     else:
-        _LAYER_UIDS[layer_name] += 1
+        _LAYER_UIDS[layer_name] = _LAYER_UIDS[layer_name] + 1
         return _LAYER_UIDS[layer_name]
 
 
 def sparse_dropout(x, keep_prob, noise_shape):
     """Dropout for sparse tensors."""
     random_tensor = keep_prob
-    random_tensor += tf.random_uniform(shape=noise_shape)
+    random_tensor = random_tensor+tf.random_uniform(shape=noise_shape)
     dropout_mask = tf.cast(tf.floor(random_tensor), dtype=tf.bool)
     pre_out = tf.sparse_retain(x, dropout_mask)
     return pre_out * (1./keep_prob)
@@ -127,7 +127,7 @@ class Dense(Layer):
 
         # bias
         if self.bias:
-            output += self.vars['bias']
+            output = output+self.vars['bias']
 
         return [self.act(output), inputs[1], inputs[2]]
 
@@ -184,7 +184,7 @@ class GraphConvolution_GCN(Layer):
         
         # bias
         if self.bias:
-            output += self.vars['bias']
+            output = output + self.vars['bias']
 
         return [self.act(output),inputs[1], inputs[2]]
     
