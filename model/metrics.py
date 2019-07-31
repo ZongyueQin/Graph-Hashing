@@ -39,13 +39,17 @@ def DSH_loss(codes, labels, m):
     bs = FLAGS.batchsize
     k = FLAGS.k
     A1, A2 = tf.split(codes, [bs, bs*k])
+
     # Handle first part of loss
+    # Some intermediate results
     M1 = tf.matmul(A1, tf.transpose(A1))
     diag = tf.squeeze(tf.matrix_diag_part(M1))
     M2 = tf.stack([diag for i in range(bs)])
-    l2_mat = tf.matrix_band_part((M2 + tf.transpose(M2) - 2*M1), 0, -1)
-    loss_mat = labels * l2_mat + (1-labels) * tf.nn.relu(m-l2_mat)
+    
+    pred_1 = tf.matrix_band_part((M2 + tf.transpose(M2) - 2*M1), 0, -1)
+    loss_mat = labels * pred_1 + (1-labels) * tf.nn.relu(m- pred_1)
     loss_1 = tf.reduce_mean(loss_mat)
+    
     
     # Handle second part of loss
     A2 = tf.reshape(A2, [bs, k, -1])
@@ -58,26 +62,35 @@ def MSE_Loss(codes, label_1, label_2):
     bs = FLAGS.batchsize
     k = FLAGS.k
     A1, A2 = tf.split(codes, [bs, bs*k])
+    
+    
     # Handle first part of loss
+    # Some intermediate results
     M1 = tf.matmul(A1, tf.transpose(A1))
     diag = tf.squeeze(tf.matrix_diag_part(M1))
     M2 = tf.stack([diag for i in range(bs)])
-    # l2_mat_{i,j} = ||d_i - d_j||^2
-    l2_mat_1 = (M2 + tf.transpose(M2) - 2*M1)
-    loss_mat_1 = tf.matrix_band_part((l2_mat_1 - label_1)**2, 0, -1)
+
+    # pred{i,j} = ||d_i - d_j||^2
+    pred_1 = (M2 + tf.transpose(M2) - 2*M1)
+    pred_1 = tf.clip_by_value(pred_1, 0, FLAGS.GED_threshold)
+    loss_mat_1 = tf.matrix_band_part((pred_1 - label_1)**2, 0, -1)
     loss_1 = tf.reduce_sum(loss_mat_1)
+    
+    
     # Handle second part of loss
-    grad = tf.gradients(loss_1, codes)
     loss_2 = 0
     if k > 0:
-      A2 = tf.reshape(A2, [bs, k, -1])
-      A3 = tf.stack([A1 for i in range(k)], axis=1)
-      l2_mat_2 = tf.reduce_sum((A2-A3)**2, axis=2) 
-      loss_mat_2 = (label_2 - l2_mat_2)**2
-      loss_2 = tf.reduce_sum(loss_mat_2)
+        # intermediate results
+        A2 = tf.reshape(A2, [bs, k, -1])
+        A3 = tf.stack([A1 for i in range(k)], axis=1)
+        
+        pred_2 = tf.reduce_sum((A2-A3)**2, axis=2) 
+        pred_2 = tf.clip_by_value(pred_1, 0, FLAGS.GED_threshold)
+        loss_mat_2 = (label_2 - pred_2)**2
+        loss_2 = tf.reduce_sum(loss_mat_2)
     
     return FLAGS.real_data_loss_weight * loss_1 +\
-           FLAGS.syn_data_loss_weight * loss_2, l2_mat_1, label_1
+           FLAGS.syn_data_loss_weight * loss_2, pred_1, label_1
 
     
 def pair_accuracy(codes, labels):

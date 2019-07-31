@@ -75,15 +75,13 @@ class DataFetcher:
 
     def get_train_data(self):
         for i in range(FLAGS.epochs*2):
-            feat, lap, sizes, labels, gen_labels, gids =  self.sample_train_data(FLAGS.batchsize)
+            feat, lap, sizes, labels, gen_labels =  self.sample_train_data(FLAGS.batchsize)
             yield np.array(feat[0]), np.array(feat[1]), np.array(feat[2]),\
             np.array(lap[0]), np.array(lap[1]), np.array(lap[2]),\
-            np.array(sizes), np.array(labels), np.array(gen_labels),\
-            np.array(gids)
+            np.array(sizes), np.array(labels), np.array(gen_labels)
         
     """ Sample training data """
     def sample_train_data(self, batchsize):
-        k = FLAGS.k
         """ we would First sample $batchsize graphs from train_graphs and 
             compute label between each pair. Then for each sampled graph we 
             randomly generate $k similar graphs as positive data. Finally we 
@@ -94,14 +92,29 @@ class DataFetcher:
         self.sample_train_graphs_and_compute_label(batchsize)
         
         # generate k similar graphs for each graph in self.sample_graphs
+        """
         generated_graphs = []
         generated_labels = []
         for g in self.sample_graphs:
             graphs, labels = self.generate_similar_graphs(g, k)
             generated_graphs = generated_graphs + graphs
             generated_labels.append(labels)
-            
         self.sample_graphs = self.sample_graphs + generated_graphs
+        """
+        self.gen_graphs = [[] for g in self.sample_graphs]
+        self.gen_labels = [[] for g in self.sample_graphs]
+        generated_labels = []
+        
+        pool = ThreadPool()
+        pairs = [(i, g) for i,g in enumerate(self.sample_graphs)]        
+        pool.map(self.gen_sim_graph_wrp, pairs)
+        pool.close()
+        pool.join()
+        
+        for graphs, labs in zip(self.gen_graphs, self.gen_labels):
+            self.sample_graphs = self.sample_graphs + graphs
+            generated_labels.append(labs)
+        
         
         # get features of each graph and stack them to one sparse matrix
         features = sp.vstack([g.sparse_node_inputs for g in self.sample_graphs])
@@ -115,8 +128,6 @@ class DataFetcher:
         # get size of each graph
         sizes = [g.nxgraph.number_of_nodes() for g in self.sample_graphs]         
         
-        gids = [g.nxgraph.graph['gid'] for g in self.sample_graphs]
-        
         if FLAGS.label_type == 'binary':
             return features, laplacians, sizes, tf.convert_to_tensor(self.labels)
         elif FLAGS.label_type == 'ged':
@@ -124,8 +135,7 @@ class DataFetcher:
                    laplacians,\
                    sizes,\
                    self.labels,\
-                   generated_labels,\
-                   gids
+                   generated_labels
         else:
             raise RuntimeError('Unrecognized label type: '+FLAGS.label_type)
         
@@ -337,6 +347,14 @@ class DataFetcher:
 
         f.close()
         return fname
+    
+    def gen_sim_graph_wrp(self, pair):
+        idx = pair[0]
+        g = pair[1]
+        gs, ls = self.generate_similar_graphs(g, FLAGS.k)
+        self.gen_graphs[idx] = self.gen_graphs[idx] + gs
+        self.gen_labels[idx] = self.gen_labels[idx] + ls
+        return
     
     def generate_similar_graphs(self, g, k):
         generated_graphs = []

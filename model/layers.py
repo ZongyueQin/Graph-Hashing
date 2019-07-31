@@ -117,18 +117,26 @@ class Dense(Layer):
     def _call(self, inputs):
         x = inputs[0]
         # dropout
-        if self.sparse_inputs:
-            x = sparse_dropout(x, 1-self.dropout, tf.reduce_sum(inputs[2]))
-        else:
-            x = tf.nn.dropout(x, rate=self.dropout)
+        #if self.sparse_inputs:
+        #    x = sparse_dropout(x, 1-self.dropout, tf.reduce_sum(inputs[2]))
+        #else:
+        #    x = tf.nn.dropout(x, rate=self.dropout)
+        
 
         # transform
         with tf.variable_scope(self.name + '_vars'):
-            output = dot(x, self.vars['weights'], sparse=self.sparse_inputs)
+            # dropout
+            weights = tf.nn.dropout(self.vars['weights'], 
+                                    rate = self.dropout)
+            if self.bias:
+                bias = tf.nn.dropout(self.vars['bias'], 
+                                     rate = self.dropout)
+
+            output = dot(x, weights, sparse=self.sparse_inputs)
 
             # bias
             if self.bias:
-                output = output+self.vars['bias']
+                output = output + bias
 
         return [self.act(output), inputs[1], inputs[2]]
 
@@ -168,25 +176,34 @@ class GraphConvolution_GCN(Layer):
         x = inputs[0]
 
         # dropout
-        if self.sparse_inputs:
-            x = sparse_dropout(x, 1-self.dropout, tf.reduce_sum(inputs[2]))
-        else:
-            x = tf.nn.dropout(x, rate=self.dropout)
+#        if self.sparse_inputs:
+#            x = sparse_dropout(x, 1-self.dropout, tf.reduce_sum(inputs[2]))
+#        else:
+#            x = tf.nn.dropout(x, rate=self.dropout)
 
         # convolve
         with tf.variable_scope(self.name + '_vars'):
+            # dropout
+            weights = tf.nn.dropout(self.vars['weights'], 
+                                    rate = self.dropout)
+            if self.bias:
+                bias = tf.nn.dropout(self.vars['bias'], 
+                                     rate = self.dropout)
+
+            
             if not self.featureless:
-                pre_sup = dot(x, self.vars['weights'],
+                pre_sup = dot(x, 
+                              weights,
                               sparse=self.sparse_inputs)
             else:
-                pre_sup = self.vars['weights']
+                pre_sup = weights
         
         
             output = dot(inputs[1], pre_sup, sparse=True)
         
             # bias
             if self.bias:
-                output = output + self.vars['bias']
+                output = output + bias
 
         return [self.act(output),inputs[1], inputs[2]]
     
@@ -237,20 +254,33 @@ class SplitAndAttentionPooling(Layer):
     def _call(self, inputs):
         features_list = tf.split(inputs[0], inputs[2])
         graph_emb_list = []
+        
         with tf.variable_scope(self.name + '_vars'):
+            # dropout
+            weights = tf.nn.dropout(self.vars['weights'], 
+                                    rate = self.dropout)
+            if self.bias:
+                bias = tf.nn.dropout(self.vars['bias'], 
+                                     rate = self.dropout)
+
             for features in features_list:
                 # Generate a graph embedding per graphs
                 graph_mean = tf.reduce_mean(features, axis=0)
-                global_feat = mat_vec_dot(self.vars['weights'], graph_mean)
+                global_feat = mat_vec_dot(weights, graph_mean)
+                
                 if self.bias:
-                    global_feat = global_feat + self.vars['bias']
+                    global_feat = global_feat + bias
+                
                 global_feat = tf.nn.relu(global_feat)
+
                 attention = self.act(mat_vec_dot(features, global_feat))
                 attention = tf.squeeze(attention)
+
                 graph_emb = tf.transpose(tf.multiply(attention, 
-                                                  tf.transpose(features)))
+                                                     tf.transpose(features)))
                 graph_emb = tf.reduce_sum(graph_emb, axis=0)
                 graph_emb_list.append(graph_emb)
             
             output = tf.stack(graph_emb_list,axis=0)
+
         return [output, inputs[1], inputs[2]]
