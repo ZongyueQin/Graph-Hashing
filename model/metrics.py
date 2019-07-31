@@ -19,6 +19,9 @@ def masked_accuracy(preds, labels, mask):
     accuracy_all *= mask
     return tf.reduce_mean(accuracy_all)
 
+def l1_loss(codes):
+     return FLAGS.l1_loss_w * tf.reduce_sum(tf.abs(codes))
+
 def binary_regularizer(codes):
     """ regularizer to force codes to be binary """
 #    distance_to_1 = tf.abs(tf.abs(codes)-1)
@@ -64,6 +67,7 @@ def MSE_Loss(codes, label_1, label_2):
     loss_mat_1 = tf.matrix_band_part((l2_mat_1 - label_1)**2, 0, -1)
     loss_1 = tf.reduce_sum(loss_mat_1)
     # Handle second part of loss
+    grad = tf.gradients(loss_1, codes)
     loss_2 = 0
     if k > 0:
       A2 = tf.reshape(A2, [bs, k, -1])
@@ -73,7 +77,7 @@ def MSE_Loss(codes, label_1, label_2):
       loss_2 = tf.reduce_sum(loss_mat_2)
     
     return FLAGS.real_data_loss_weight * loss_1 +\
-           FLAGS.syn_data_loss_weight * loss_2
+           FLAGS.syn_data_loss_weight * loss_2, l2_mat_1, label_1
 
     
 def pair_accuracy(codes, labels):

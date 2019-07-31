@@ -42,7 +42,7 @@ class DataFetcher:
         self.test_data_dir = os.path.join(self.data_dir, 'test')
         # read graphs
         train_graphs = self._readGraphs(self.train_data_dir)
-        train_graphs = train_graphs[0:FLAGS.batchsize*(1+FLAGS.k)]
+        #train_graphs = train_graphs[0:FLAGS.batchsize*(1+FLAGS.k)]
 
         test_graphs = self._readGraphs(self.test_data_dir)
         shuffle(test_graphs)
@@ -73,9 +73,14 @@ class DataFetcher:
             raise RuntimeError('train_graphs is empty, can\'t get feature dim')
         return self.train_graphs[0].sparse_node_inputs.shape[1]
 
-    def _parse_function(self, iteration):
-        return self.sample_train_data(FLAGS.batchsize)
-    
+    def get_train_data(self):
+        for i in range(FLAGS.epochs*2):
+            feat, lap, sizes, labels, gen_labels, gids =  self.sample_train_data(FLAGS.batchsize)
+            yield np.array(feat[0]), np.array(feat[1]), np.array(feat[2]),\
+            np.array(lap[0]), np.array(lap[1]), np.array(lap[2]),\
+            np.array(sizes), np.array(labels), np.array(gen_labels),\
+            np.array(gids)
+        
     """ Sample training data """
     def sample_train_data(self, batchsize):
         k = FLAGS.k
@@ -109,13 +114,18 @@ class DataFetcher:
         
         # get size of each graph
         sizes = [g.nxgraph.number_of_nodes() for g in self.sample_graphs]         
+        
+        gids = [g.nxgraph.graph['gid'] for g in self.sample_graphs]
+        
         if FLAGS.label_type == 'binary':
             return features, laplacians, sizes, tf.convert_to_tensor(self.labels)
         elif FLAGS.label_type == 'ged':
-            return tf.SparseTensor(features[0], features[1], features[2]),\
-                   tf.SparseTensor(laplacians[0], laplacians[1], laplacians[2]),\
-                   tf.convert_to_tensor(sizes), tf.convert_to_tensor(self.labels),\
-                   tf.convert_to_tensor(generated_labels)
+            return features,\
+                   laplacians,\
+                   sizes,\
+                   self.labels,\
+                   generated_labels,\
+                   gids
         else:
             raise RuntimeError('Unrecognized label type: '+FLAGS.label_type)
         
@@ -123,9 +133,12 @@ class DataFetcher:
     def sample_train_graphs_and_compute_label(self, batchsize):
         # sample $batchsize graphs
         start = self.cur_train_sample_ptr
+        #else:
+        #    start = batchsize*iteration%len(self.train_graphs)
         end = start + batchsize
         if end > len(self.train_graphs):
             end = len(self.train_graphs)
+        
         sample_graphs = self.train_graphs[start:end]
         self.cur_train_sample_ptr = end
         # set pointer to the beginning and shuffle if pointer is at end
@@ -161,6 +174,8 @@ class DataFetcher:
             raise RuntimeError('unrecognized tvt label '+str(tvt))
             
         for idx in idx_list:
+        #    print('without label')
+        #    print(target_list[idx].nxgraph.graph['gid'])
             graphs.append(target_list[idx])
         
         features = sp.vstack([g.sparse_node_inputs for g in graphs])
@@ -170,6 +185,7 @@ class DataFetcher:
         laplacians = self._sparse_to_tuple(laplacians)
         
         sizes = [g.nxgraph.number_of_nodes() for g in graphs]
+        self.batch_node_num = sum(sizes)
                 
         return features, laplacians, sizes
 
@@ -189,8 +205,8 @@ class DataFetcher:
             g = nx.read_gexf(file)
             g.graph['gid'] = gid
             graphs.append(g)
-            if len(graphs) == FLAGS.batchsize*(1+FLAGS.k):
-                break
+#            if len(graphs) == FLAGS.batchsize*(1+FLAGS.k):
+#                break
 #            if not nx.is_connected(g):
 #                print('{} not connected'.format(gid))
                 

@@ -1,24 +1,22 @@
 from config import FLAGS
 import numpy as np
+import tensorflow as tf
 
-def construct_feed_dict_prefetch(data, data_fetcher, placeholders):
-    features = data[0]
-    laplacians = data[1]
-    sizes = data[2]
-    labels = data[3]
-    if FLAGS.label_type == 'ged':
-        generated_labels = data[4]
-    nfn = data_fetcher.get_node_feature_dim()
+def construct_input(data):
+    features = tf.SparseTensor(data[0],data[1],data[2])
+    laplacians = tf.SparseTensor(data[3],data[4],data[5])
+    features = tf.sparse.reorder(features)
+    laplacians = tf.sparse.reorder(laplacians)
+    
+    return features, laplacians, data[6], data[7], data[8]
+
+def construct_feed_dict_prefetch(data_fetcher, placeholders):
+
     feed_dict = dict()
-    feed_dict.update({placeholders['labels']: labels})
+#    nfn = data_fetcher.get_node_feature_dim()
     feed_dict.update({placeholders['dropout']: FLAGS.dropout})
-    feed_dict.update({placeholders['features']: features})
-    feed_dict.update({placeholders['support']: laplacians})
-    feed_dict.update({placeholders['num_features_nonzero']: [nfn]})
-    feed_dict.update({placeholders['graph_sizes']: sizes})
-    if FLAGS.label_type == 'ged':
-        feed_dict.update({placeholders['generated_labels']: generated_labels})
-
+  #  feed_dict.update({placeholders['num_features_nonzero']: [data_fetcher.batch_node_num]})
+    
     return feed_dict
 
 def construct_feed_dict_for_train(data_fetcher, placeholders):
@@ -36,7 +34,7 @@ def construct_feed_dict_for_train(data_fetcher, placeholders):
     feed_dict.update({placeholders['dropout']: FLAGS.dropout})
     feed_dict.update({placeholders['features']: features})
     feed_dict.update({placeholders['support']: laplacians})
-    feed_dict.update({placeholders['num_features_nonzero']: [nfn]})
+ #   feed_dict.update({placeholders['num_features_nonzero']: [data_fetcher.batch_node_num]})
     feed_dict.update({placeholders['graph_sizes']: sizes})
     if FLAGS.label_type == 'ged':
         feed_dict.update({placeholders['generated_labels']: generated_labels})
@@ -52,7 +50,7 @@ def construct_feed_dict_for_encode(data_fetcher, placeholders, idx_list, tvt):
     feed_dict.update({placeholders['dropout']: 0})
     feed_dict.update({placeholders['features']: features})
     feed_dict.update({placeholders['support']: laplacians})
-    feed_dict.update({placeholders['num_features_nonzero']: [nfn]})
+#    feed_dict.update({placeholders['num_features_nonzero']: [data_fetcher.batch_node_num]})
     feed_dict.update({placeholders['graph_sizes']: sizes})
     return feed_dict
 
@@ -65,7 +63,7 @@ def construct_feed_dict_for_query(data_fetcher, placeholders, idx_list, tvt):
     feed_dict.update({placeholders['dropout']: 0})
     feed_dict.update({placeholders['features']: features})
     feed_dict.update({placeholders['support']: laplacians})
-    feed_dict.update({placeholders['num_features_nonzero']: [nfn]})
+   # feed_dict.update({placeholders['num_features_nonzero']: [data_fetcher.batch_node_num]})
     feed_dict.update({placeholders['graph_sizes']: sizes})
     return feed_dict
 

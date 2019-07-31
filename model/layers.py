@@ -19,7 +19,7 @@ def get_layer_uid(layer_name=''):
 def sparse_dropout(x, keep_prob, noise_shape):
     """Dropout for sparse tensors."""
     random_tensor = keep_prob
-    random_tensor = random_tensor+tf.random_uniform(shape=noise_shape)
+    random_tensor = random_tensor+tf.random_uniform(shape=tf.reshape(noise_shape,[1]))
     dropout_mask = tf.cast(tf.floor(random_tensor), dtype=tf.bool)
     pre_out = tf.sparse_retain(x, dropout_mask)
     return pre_out * (1./keep_prob)
@@ -103,7 +103,7 @@ class Dense(Layer):
         self.bias = bias
 
         # helper variable for sparse dropout
-        self.num_features_nonzero = placeholders['num_features_nonzero']
+        #self.num_features_nonzero = placeholders['num_features_nonzero']
 
         with tf.variable_scope(self.name + '_vars'):
             self.vars['weights'] = glorot([input_dim, output_dim],
@@ -118,16 +118,17 @@ class Dense(Layer):
         x = inputs[0]
         # dropout
         if self.sparse_inputs:
-            x = sparse_dropout(x, 1-self.dropout, self.num_features_nonzero)
+            x = sparse_dropout(x, 1-self.dropout, tf.reduce_sum(inputs[2]))
         else:
-            x = tf.nn.dropout(x, 1-self.dropout)
+            x = tf.nn.dropout(x, rate=self.dropout)
 
         # transform
-        output = dot(x, self.vars['weights'], sparse=self.sparse_inputs)
+        with tf.variable_scope(self.name + '_vars'):
+            output = dot(x, self.vars['weights'], sparse=self.sparse_inputs)
 
-        # bias
-        if self.bias:
-            output = output+self.vars['bias']
+            # bias
+            if self.bias:
+                output = output+self.vars['bias']
 
         return [self.act(output), inputs[1], inputs[2]]
 
@@ -151,7 +152,7 @@ class GraphConvolution_GCN(Layer):
         self.bias = bias
 
         # helper variable for sparse dropout
-        self.num_features_nonzero = placeholders['num_features_nonzero']
+        #self.num_features_nonzero = placeholders['num_features_nonzero']
         
         with tf.variable_scope(self.name + '_vars'):
             
@@ -168,23 +169,24 @@ class GraphConvolution_GCN(Layer):
 
         # dropout
         if self.sparse_inputs:
-            x = sparse_dropout(x, 1-self.dropout, self.num_features_nonzero)
+            x = sparse_dropout(x, 1-self.dropout, tf.reduce_sum(inputs[2]))
         else:
-            x = tf.nn.dropout(x, 1-self.dropout)
+            x = tf.nn.dropout(x, rate=self.dropout)
 
         # convolve
-        if not self.featureless:
-            pre_sup = dot(x, self.vars['weights'],
+        with tf.variable_scope(self.name + '_vars'):
+            if not self.featureless:
+                pre_sup = dot(x, self.vars['weights'],
                               sparse=self.sparse_inputs)
-        else:
-            pre_sup = self.vars['weights']
+            else:
+                pre_sup = self.vars['weights']
         
         
-        output = dot(inputs[1], pre_sup, sparse=True)
+            output = dot(inputs[1], pre_sup, sparse=True)
         
-        # bias
-        if self.bias:
-            output = output + self.vars['bias']
+            # bias
+            if self.bias:
+                output = output + self.vars['bias']
 
         return [self.act(output),inputs[1], inputs[2]]
     
@@ -220,7 +222,7 @@ class SplitAndAttentionPooling(Layer):
         # the output dimension is same as input dimension
         self.output_dim = input_dim
         # helper variable for sparse dropout
-        self.num_features_nonzero = placeholders['num_features_nonzero']
+        #self.num_features_nonzero = placeholders['num_features_nonzero']
         
         with tf.variable_scope(self.name + '_vars'):
             
@@ -235,19 +237,20 @@ class SplitAndAttentionPooling(Layer):
     def _call(self, inputs):
         features_list = tf.split(inputs[0], inputs[2])
         graph_emb_list = []
-        for features in features_list:
-            # Generate a graph embedding per graphs
-            graph_mean = tf.reduce_mean(features, axis=0)
-            global_feat = mat_vec_dot(self.vars['weights'], graph_mean)
-            if self.bias:
-                global_feat = global_feat + self.vars['bias']
-            global_feat = tf.nn.relu(global_feat)
-            attention = self.act(mat_vec_dot(features, global_feat))
-            attention = tf.squeeze(attention)
-            graph_emb = tf.transpose(tf.multiply(attention, 
+        with tf.variable_scope(self.name + '_vars'):
+            for features in features_list:
+                # Generate a graph embedding per graphs
+                graph_mean = tf.reduce_mean(features, axis=0)
+                global_feat = mat_vec_dot(self.vars['weights'], graph_mean)
+                if self.bias:
+                    global_feat = global_feat + self.vars['bias']
+                global_feat = tf.nn.relu(global_feat)
+                attention = self.act(mat_vec_dot(features, global_feat))
+                attention = tf.squeeze(attention)
+                graph_emb = tf.transpose(tf.multiply(attention, 
                                                   tf.transpose(features)))
-            graph_emb = tf.reduce_sum(graph_emb, axis=0)
-            graph_emb_list.append(graph_emb)
+                graph_emb = tf.reduce_sum(graph_emb, axis=0)
+                graph_emb_list.append(graph_emb)
             
-        output = tf.stack(graph_emb_list,axis=0)
+            output = tf.stack(graph_emb_list,axis=0)
         return [output, inputs[1], inputs[2]]

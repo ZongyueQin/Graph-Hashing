@@ -10,10 +10,13 @@ for key in D.keys():
     lis = D[key]
     for pair in lis:
         codes.append(list(pair[1]))
-codes = tf.constant(codes)
-labels = 8*np.ones((5,5))
-for i in range(5):
-    labels[i,i]=0
+print(codes)
+codes = tf.constant(codes)  
+labels = np.array([[0., 8., 8., 5., 8.],
+ [8., 0., 8., 8., 5.],
+ [8., 8., 0., 8., 8.],
+ [5., 8., 8., 0., 8.],
+ [8., 5., 8., 8., 0.]])
 #loss = MSE_Loss(codes, labels, None)
 sess = tf.Session()
 #a = sess.run(loss)
@@ -31,4 +34,8 @@ loss_1 = tf.reduce_sum(loss_mat_1)
 
 lis = sess.run([A1,A2,M1,diag,M2,l2_mat_1,loss_mat_1,loss_1])
 print(lis)
+
+grad = tf.gradients(loss_1, codes)
+g = sess.run(grad)
+print(g)
     

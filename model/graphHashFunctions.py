@@ -141,11 +141,13 @@ class GraphHash_Naive(Model):
             self.graph_embs.append(graph_emb[0])
             self.activations.append(hidden)
         
+        
         final_graph_emb = tf.concat(self.graph_embs, axis=1)
         self.activations.append([final_graph_emb, hidden[1], hidden[2]])
         
         for mlp_layer in self.layers[2]:
             hidden = mlp_layer(self.activations[-1])
+            
             self.activations.append(hidden)
             
         self.outputs = self.activations[-1]
@@ -165,16 +167,74 @@ class GraphHash_Naive(Model):
 
 
 class GraphHash_Rank(GraphHash_Naive):
+    def __init__(self, placeholders, input_dim, next_ele, **kwargs):
+        super(GraphHash_Naive, self).__init__(**kwargs)
+
+        self.graph_embs = []
+        self.inputs = [next_ele[0], next_ele[1], next_ele[2]]
+        self.labels = next_ele[3]
+        self.gen_labels = None
+        if FLAGS.label_type == 'ged':
+            self.gen_labels = next_ele[4]
+            
+        self.input_dim = input_dim
+        # self.input_dim = self.inputs.get_shape().as_list()[1]  # To be supported in future Tensorflow versions
+        self.output_dim = FLAGS.hash_code_len
+        self.placeholders = placeholders
+
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate)
+
+        self.build()
+        
+        self.build_encode()
+        
+    def build_encode(self):
+        placeholders = self.placeholders
+        self.ecd_inputs = [placeholders['features'], 
+                       placeholders['support'],
+                       placeholders['graph_sizes']]
+        
+        self.ecd_inputs[0] = tf.sparse.reorder(self.ecd_inputs[0])
+        self.ecd_inputs[1] = tf.sparse.reorder(self.ecd_inputs[1])
+        
+        self.ecd_activations = []
+        self.ecd_activations.append(self.ecd_inputs)
+        self.ecd_graph_embs = []
+        # conv layers
+        for conv_layer, pool_layer in zip(self.layers[0], self.layers[1]):
+            hidden = conv_layer(self.ecd_activations[-1])
+            graph_emb = pool_layer(hidden)
+            self.ecd_graph_embs.append(graph_emb[0])
+            self.ecd_activations.append(hidden)
+        
+        final_graph_emb = tf.concat(self.ecd_graph_embs, axis=1)
+        self.ecd_activations.append([final_graph_emb, hidden[1], hidden[2]])
+        
+        for mlp_layer in self.layers[2]:
+            hidden = mlp_layer(self.ecd_activations[-1])
+            self.ecd_activations.append(hidden)
+            
+        self.encode_outputs = self.ecd_activations[-1]
+        self.codes = self.encode_outputs[0] > placeholders['thres']
+
     def _loss(self):
         # Weight decay loss
+        self.loss = 0
         for layer_type in self.layers:
             for layer in layer_type:
                 for var in layer.vars.values():
-                    self.loss += FLAGS.weight_decay * tf.nn.l2_loss(var)
+                    self.loss = self.loss+FLAGS.weight_decay * tf.nn.l2_loss(var)
 
-        self.loss += MSE_Loss(self.outputs[0], 
-                              self.placeholders['labels'], 
-                              self.placeholders['generated_labels'])
+        mse_loss, pred, lab = MSE_Loss(self.outputs[0], 
+                              self.labels, 
+                              self.gen_labels)
+
+        self.loss = self.loss + l1_loss(self.outputs[0])
+
+        self.loss = self.loss + mse_loss
+        self.mse_loss = mse_loss
+        self.pred = pred
+        self.lab = lab
 
 class GraphHash_Rank_Reg(GraphHash_Naive):
     def _loss(self):
