@@ -5,9 +5,13 @@ import tensorflow as tf
 def construct_input(data):
     features = tf.SparseTensor(data[0],data[1],data[2])
     laplacians = tf.SparseTensor(data[3],data[4],data[5])
-    features = tf.sparse.reorder(features)
-    laplacians = tf.sparse.reorder(laplacians)
-    
+    try:
+        features = tf.sparse.reorder(features)
+        laplacians = tf.sparse.reorder(laplacians)
+    except AttributeError:
+        features = tf.sparse_reorder(features)
+        laplacians = tf.sparse_reorder(laplacians)
+        
     return features, laplacians, data[6], data[7], data[8]
 
 def construct_feed_dict_prefetch(data_fetcher, placeholders):

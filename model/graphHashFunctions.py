@@ -104,17 +104,17 @@ class GraphHash_Naive(Model):
                                  dropout=FLAGS.dropout>0,
                                  logging=self.logging))
 
+#        mlp_layers.append(Dense(input_dim=FLAGS.hidden5,
+#                                 output_dim=FLAGS.hidden6,
+#                                 placeholders=self.placeholders,
+#                                 act=tf.nn.relu,
+#                                 bias=True,
+#                                 dropout=FLAGS.dropout>0,
+#                                 logging=self.logging))
+
+
+
         mlp_layers.append(Dense(input_dim=FLAGS.hidden5,
-                                 output_dim=FLAGS.hidden6,
-                                 placeholders=self.placeholders,
-                                 act=tf.nn.relu,
-                                 bias=True,
-                                 dropout=FLAGS.dropout>0,
-                                 logging=self.logging))
-
-
-
-        mlp_layers.append(Dense(input_dim=FLAGS.hidden6,
                                  output_dim=self.output_dim,
                                  placeholders=self.placeholders,
                                  act=lambda x: x,
@@ -193,10 +193,13 @@ class GraphHash_Rank(GraphHash_Naive):
         self.ecd_inputs = [placeholders['features'], 
                        placeholders['support'],
                        placeholders['graph_sizes']]
-        
-        self.ecd_inputs[0] = tf.sparse.reorder(self.ecd_inputs[0])
-        self.ecd_inputs[1] = tf.sparse.reorder(self.ecd_inputs[1])
-        
+        try: 
+            self.ecd_inputs[0] = tf.sparse.reorder(self.ecd_inputs[0])
+            self.ecd_inputs[1] = tf.sparse.reorder(self.ecd_inputs[1])
+        except AttributeError:
+            self.ecd_inputs[0] = tf.sparse_reorder(self.ecd_inputs[0])
+            self.ecd_inputs[1] = tf.sparse_reorder(self.ecd_inputs[1])
+ 
         self.ecd_activations = []
         self.ecd_activations.append(self.ecd_inputs)
         self.ecd_graph_embs = []

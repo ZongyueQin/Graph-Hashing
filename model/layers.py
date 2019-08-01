@@ -127,10 +127,10 @@ class Dense(Layer):
         with tf.variable_scope(self.name + '_vars'):
             # dropout
             weights = tf.nn.dropout(self.vars['weights'], 
-                                    rate = self.dropout)
+                                    1 - self.dropout)
             if self.bias:
                 bias = tf.nn.dropout(self.vars['bias'], 
-                                     rate = self.dropout)
+                                     1 - self.dropout)
 
             output = dot(x, weights, sparse=self.sparse_inputs)
 
@@ -185,10 +185,10 @@ class GraphConvolution_GCN(Layer):
         with tf.variable_scope(self.name + '_vars'):
             # dropout
             weights = tf.nn.dropout(self.vars['weights'], 
-                                    rate = self.dropout)
+                                    1 - self.dropout)
             if self.bias:
                 bias = tf.nn.dropout(self.vars['bias'], 
-                                     rate = self.dropout)
+                                     1 - self.dropout)
 
             
             if not self.featureless:
@@ -258,10 +258,10 @@ class SplitAndAttentionPooling(Layer):
         with tf.variable_scope(self.name + '_vars'):
             # dropout
             weights = tf.nn.dropout(self.vars['weights'], 
-                                    rate = self.dropout)
+                                    1 - self.dropout)
             if self.bias:
                 bias = tf.nn.dropout(self.vars['bias'], 
-                                     rate = self.dropout)
+                                     1 - self.dropout)
 
             for features in features_list:
                 # Generate a graph embedding per graphs

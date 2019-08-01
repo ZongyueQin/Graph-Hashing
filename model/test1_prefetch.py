@@ -21,13 +21,14 @@ from config import FLAGS
 from DataFetcher import DataFetcher
 import pickle
 
-os.environ['CUDA_VISIBLE_DEVICES']='0'
+os.environ['CUDA_VISIBLE_DEVICES']='7'
+test_top_k = False
+test_range_query = False
 
 # Set random seed
 seed = 123
 np.random.seed(seed)
 tf.set_random_seed(seed)
-
 
 
 # Load data
@@ -431,84 +432,85 @@ else:
                 MSE_test_dis = MSE_test_dis + ((true_ged[l]-est_ged)**2)/(total_query_num*encode_batchsize)
                 l = l + 1
 
-
-            # top k query
-            est_top_k_wrp = get_top_k_similar_graphs_gid(inverted_index, 
-                                                         tuple_code,
-                                                         emb,
-                                                         FLAGS.top_k)
+            if test_top_k:
+                # top k query
+                est_top_k_wrp = get_top_k_similar_graphs_gid(inverted_index, 
+                                                             tuple_code,
+                                                             emb,
+                                                             FLAGS.top_k)
             
-            ground_truth[q] = sorted(ground_truth[q], 
-                        key=lambda x: x[1]*10000000 + x[0])
+                ground_truth[q] = sorted(ground_truth[q], 
+                            key=lambda x: x[1]*10000000 + x[0])
 
-            pos = FLAGS.top_k
-            while ground_truth[q][pos][1] == ground_truth[q][pos-1][1]:
-                pos = pos + 1
-                if pos == len(ground_truth[q]):
-                    break
+                pos = FLAGS.top_k
+                while ground_truth[q][pos][1] == ground_truth[q][pos-1][1]:
+                    pos = pos + 1
+                    if pos == len(ground_truth[q]):
+                        break
 
-            true_top_k_wrp = ground_truth[q][0:pos]
+                true_top_k_wrp = ground_truth[q][0:pos]
         
-            est_top_k = [pair[0] for pair in est_top_k_wrp]
-            true_top_k = [pair[0] for pair in true_top_k_wrp]
-#           print(true_top_k)
-#           print(est_top_k)
+                est_top_k = [pair[0] for pair in est_top_k_wrp]
+                true_top_k = [pair[0] for pair in true_top_k_wrp]
+#               print(true_top_k)
+#               print(est_top_k)
 
-            PAtKs.append(len(set(est_top_k)&set(true_top_k)) / FLAGS.top_k)
-            true_top_k = true_top_k[0:FLAGS.top_k]
-            rho, _ = spearmanr(est_top_k, true_top_k)
-            SRCCs.append(rho)
-            tau, _ = kendalltau(est_top_k, true_top_k)
-            KRCCs.append(tau)
+                PAtKs.append(len(set(est_top_k)&set(true_top_k)) / FLAGS.top_k)
+                true_top_k = true_top_k[0:FLAGS.top_k]
+                rho, _ = spearmanr(est_top_k, true_top_k)
+                SRCCs.append(rho)
+                tau, _ = kendalltau(est_top_k, true_top_k)
+                KRCCs.append(tau)
 
 
         
             # range query
-            cur_pos = 0
-            for t in range(1,t_max):
-                similar_set_wrp = get_similar_graphs_gid(inverted_index,
+            if test_range_query:
+                cur_pos = 0
+                for t in range(1,t_max):
+                    similar_set_wrp = get_similar_graphs_gid(inverted_index,
                                                          tuple_code,
                                                          t)
-                similar_set = set([pair[0] for pair in similar_set_wrp])
+                    similar_set = set([pair[0] for pair in similar_set_wrp])
 
-                while cur_pos < len(ground_truth[q]) and\
-                      ground_truth[q][cur_pos][1] <= t:
-                    cur_pos = cur_pos + 1
+                    while cur_pos < len(ground_truth[q]) and\
+                          ground_truth[q][cur_pos][1] <= t:
+                        cur_pos = cur_pos + 1
 
-                real_sim_set_wrp = ground_truth[q][0:cur_pos]
-                real_sim_set = set([pair[0] for pair in real_sim_set_wrp])
+                    real_sim_set_wrp = ground_truth[q][0:cur_pos]
+                    real_sim_set = set([pair[0] for pair in real_sim_set_wrp])
 
-                tmp = similar_set & real_sim_set
-                if len(similar_set) == 0:
-                    if len(real_sim_set) == 0:
-                        precision = 1
-                    else:
-                        precision = 0
-                else:
-                    precision =  len(tmp)/len(similar_set)
-            
-                precisions[t-1].append(precision)
-
-                if len(real_sim_set) == 0:
-                    zero_cnt[t-1] = zero_cnt[t-1] + 1
+                    tmp = similar_set & real_sim_set
                     if len(similar_set) == 0:
-                        recall = 1
+                        if len(real_sim_set) == 0:
+                            precision = 1
+                        else:
+                            precision = 0
                     else:
-                        recall = 0
-                else:
-                    recall = len(tmp)/len(real_sim_set)
-                recalls[t-1].append(recall)
-        
-                if precision * recall == 0:
-                    if len(real_sim_set) == 0 and\
-                       len(similar_set) == 0:
-                        f1_score = 1
-                    else:
-                        f1_score = 0
-                else:
-                    f1_score = 2*precision*recall/(precision+recall)
+                        precision =  len(tmp)/len(similar_set)
             
-            f1_scores[t-1].append(f1_score)
+                    precisions[t-1].append(precision)
+
+                    if len(real_sim_set) == 0:
+                        zero_cnt[t-1] = zero_cnt[t-1] + 1
+                        if len(similar_set) == 0:
+                            recall = 1
+                        else:
+                            recall = 0
+                    else:
+                        recall = len(tmp)/len(real_sim_set)
+                    recalls[t-1].append(recall)
+          
+                    if precision * recall == 0:
+                        if len(real_sim_set) == 0 and\
+                            len(similar_set) == 0:
+                            f1_score = 1
+                        else:
+                            f1_score = 0
+                    else:
+                        f1_score = 2*precision*recall/(precision+recall)
+            
+                f1_scores[t-1].append(f1_score)
         
 
 print(test_ged_cnt)
@@ -516,12 +518,13 @@ print(pred_cnt)
 print('MSE for test (continuous) = {:f}'.format(MSE_test_con))
 print('MSE for test (discrete) = {:f}'.format(MSE_test_dis))
 
-if has_GT:
+if test_top_k:
     print('For Top-k query, k={:d}'.format(FLAGS.top_k))
     print('average precision at k = {:f}'.format(sum(PAtKs)/len(PAtKs)))
     print('average rho = {:f}'.format(sum(SRCCs)/len(SRCCs)))
     print('average tau = {:f}'.format(sum(KRCCs)/len(KRCCs)))
 
+if test_range_query:
     print('For range query')
     for t in range(1,t_max):
         print('threshold = {:d}'.format(t))    
