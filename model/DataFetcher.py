@@ -17,6 +17,7 @@ import time
 import subprocess
 import tensorflow as tf
 
+from nx_to_gxl import nx_to_gxl
 from config import FLAGS
 from utils import sorted_nicely
 
@@ -24,9 +25,9 @@ class DataFetcher:
     """ Represents a set of data """
     
     """ read training graphs and test graphs """
-    def __init__(self, dataset):
+    def __init__(self, dataset, exact_ged = False):
         
-        
+        self.exact_ged = exact_ged
         # a helper object to map features to consecutive integer
         self.type_hash={}
         self.typeCnt = 0
@@ -161,13 +162,17 @@ class DataFetcher:
 
         self.sample_graphs = sample_graphs
         # Compute Label of every pair
-        self.labels = np.zeros((batchsize, batchsize))
-        # compute in parallel for efficiency
-        pool = ThreadPool()
-        pairs = [(g1_id, g2_id) for g1_id, g2_id in itertools.product(range(batchsize), range(batchsize))]
-        pool.map(self.getLabelsForSampledGraphs, pairs)
-        pool.close()
-        pool.join()
+        if not self.exact_ged:
+            self.labels = self.getApproxGEDForEachPair(sample_graphs)
+        else:
+            self.labels = np.zeros((batchsize, batchsize))
+            # compute in parallel for efficiency
+            pool = ThreadPool()
+            pairs = [(g1_id, g2_id) for g1_id, g2_id in itertools.product(range(batchsize), range(batchsize))]
+            pool.map(self.getLabelsForSampledGraphs, pairs)
+            pool.close()
+            pool.join()
+
         return
  
     # get certain graphs in self.training_graphs according to idx_list
@@ -283,7 +288,68 @@ class DataFetcher:
 
         return sparse_mx
 
+    def getApproxGEDForEachPair(self, graphs):
+
+        n = len(graphs)
+        geds = np.zeros((n,n))
+        collection_file = os.path.join('tmpfile',
+                                        str(time.time())+'.xml')
+        f = open(collection_file, 'w')
+        f.write('<?xml version="1.0"?>\n<GraphCollection>\n<graphs>\n')        
+        fnames = []
+        for g in graphs:
+            fname = os.path.join('tmpfile',
+                                 str(time.time())+\
+                                 str(g.nxgraph.graph['gid'])+'.gxl')
+
+            nx_to_gxl(g.nxgraph, g.nxgraph.graph['gid'], fname)
+            f.write('<print file="{}"/>\n'.format(fname))
+            fnames.append(fname)     
+            
+        f.write('</graphs>\n</GraphCollection>')
+        f.close()
+        ged_1 = subprocess.check_output(['java', '-cp', 
+                                         'graph-matching-toolkit/src',
+                                         'algorithms.GraphMatching',
+                                         self.data_dir+'/prop/VJ.prop',
+                                         collection_file, 
+                                         collection_file])
+    
+        ged_2 = subprocess.check_output(['java', '-cp', 
+                                         'graph-matching-toolkit/src',
+                                         'algorithms.GraphMatching',
+                                         self.data_dir+'/prop/beam.prop',
+                                         collection_file, 
+                                         collection_file])
+    
+        ged_3 = subprocess.check_output(['java', '-cp', 
+                                         'graph-matching-toolkit/src',
+                                         'algorithms.GraphMatching',
+                                         self.data_dir+'/prop/hungarian.prop',
+                                         collection_file, 
+                                         collection_file])
+  
+        ged_1_list = ged_1.split()
+        ged_2_list = ged_2.split()
+        ged_3_list = ged_3.split()
+        for i in range(n):
+            for j in range(i + 1, n, 1):
+                ged = min([float(ged_1_list[i*n+j]), float(ged_1_list[j*n+i]),
+                           float(ged_2_list[i*n+j]), float(ged_2_list[j*n+i]),
+                           float(ged_3_list[i*n+j]), float(ged_3_list[j*n+i]),
+                           FLAGS.GED_threshold])
+                geds[i,j] = ged    
+                geds[j,i] = ged
+    
+        os.remove(collection_file)
+        for fname in fnames:
+            os.remove(fname)
+        
+        return geds
+        
+
     def getLabelForPair(self, g1, g2):
+        
         g1_fname = self.writeGraph2TempFile(g1)
         g2_fname = self.writeGraph2TempFile(g2)
 
@@ -295,7 +361,7 @@ class DataFetcher:
         os.remove(g2_fname)
         os.remove(g1_fname+'_ordered')
         os.remove(g2_fname+'_ordered')
-
+        
         return int(ged)
         
     def getLabelsForSampledGraphs(self, pair):

@@ -74,8 +74,8 @@ def MSE_Loss(codes, label_1, label_2):
     pred_1 = (M2 + tf.transpose(M2) - 2*M1)
     pred_1 = tf.clip_by_value(pred_1, 0, FLAGS.GED_threshold)
     loss_mat_1 = tf.matrix_band_part((pred_1 - label_1)**2, 0, -1)
-    loss_1 = tf.reduce_sum(loss_mat_1)
-    
+    #loss_1 = tf.reduce_sum(loss_mat_1)
+    loss_1 = tf.reduce_mean(loss_mat_1)
     
     # Handle second part of loss
     loss_2 = 0
@@ -87,8 +87,9 @@ def MSE_Loss(codes, label_1, label_2):
         pred_2 = tf.reduce_sum((A2-A3)**2, axis=2) 
         pred_2 = tf.clip_by_value(pred_1, 0, FLAGS.GED_threshold)
         loss_mat_2 = (label_2 - pred_2)**2
-        loss_2 = tf.reduce_sum(loss_mat_2)
-    
+#        loss_2 = tf.reduce_sum(loss_mat_2)
+        loss_2 = tf.reduce_mean(loss_mat_2)
+        
     return FLAGS.real_data_loss_weight * loss_1 +\
            FLAGS.syn_data_loss_weight * loss_2, pred_1, label_1
 

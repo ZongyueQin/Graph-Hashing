@@ -8,7 +8,7 @@ flags.DEFINE_float('valid_percentage', 0, 'percentage of validation set')
 flags.DEFINE_string('dataset', 'AIDS700nef', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
 flags.DEFINE_string('model', 'gcn', 'Model string.')  # 'gcn', 'gcn_cheby', 'dense'
 flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate.')
-flags.DEFINE_integer('epochs', 5, 'Number of epochs to train.')
+flags.DEFINE_integer('epochs', 200, 'Number of epochs to train.')
 
 flags.DEFINE_integer('hidden1', 256, 'Number of units in hidden layer 1.')
 flags.DEFINE_integer('hidden2', 128, 'Number of units in hidden layer 2.')
@@ -26,11 +26,11 @@ flags.DEFINE_integer('early_stopping', 10, 'Tolerance for early stopping (# of e
 flags.DEFINE_float('DSH_loss_m',24,'parameter m for DSH loss')
 flags.DEFINE_float('binary_regularizer_weight',0.5,'weight for binary regularizer')
 flags.DEFINE_float('real_data_loss_weight', 1, 'weight of real data part (loss_1) in MSE_loss')
-flags.DEFINE_float('syn_data_loss_weight', 10, 'weight of synthesized data part (loss_2) in MSE_loss')
+flags.DEFINE_float('syn_data_loss_weight', 1, 'weight of synthesized data part (loss_2) in MSE_loss')
 flags.DEFINE_float('l1_loss_w',0.0,'weight of l1 loss for codes')
         
 flags.DEFINE_integer('max_degree', 3, 'Maximum Chebyshev polynomial degree.')
-flags.DEFINE_integer('batchsize',5,'batch size for training')
+flags.DEFINE_integer('batchsize',10,'batch size for training')
 flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
 flags.DEFINE_string('node_feat_name','type','Name of node feature')
 flags.DEFINE_string('node_label_name', 'label', 'Name of node label, none if it\'s idx')
