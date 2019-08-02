@@ -61,6 +61,22 @@ class DataFetcher:
         self.cur_valid_sample_ptr = 0
         self.cur_test_sample_ptr = 0
 
+    def get_pos_by_gid(self, gid, tvt):
+        if tvt == 'train':
+            lis = self.train_graphs
+        elif tvt == 'valid':
+            lis = self.valid_graphs
+        elif tvt == 'test':
+            lis = self.test_graphs
+        else:
+            raise RuntimeError('unrecognized tvt: {}'.format(tvt))
+
+        for pos, g in enumerate(lis):
+            if g.nxgraph.graph['gid'] == gid:
+                return pos
+
+        return -1
+
     """ return a training graph's gid """
     def get_train_graph_gid(self, pos):
         return self.train_graphs[pos].nxgraph.graph['gid']

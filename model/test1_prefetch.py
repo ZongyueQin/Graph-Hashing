@@ -21,9 +21,9 @@ from config import FLAGS
 from DataFetcher import DataFetcher
 import pickle
 
-os.environ['CUDA_VISIBLE_DEVICES']='7'
-test_top_k = False
-test_range_query = False
+os.environ['CUDA_VISIBLE_DEVICES']='2'
+test_top_k = True
+test_range_query = True
 
 # Set random seed
 seed = 123
@@ -242,6 +242,9 @@ for i in range(100):
     code1 = np.array(codes[0], dtype=np.float32)
     code2 = np.array(codes[1], dtype=np.float32)
     est_ged = np.sum((code1-code2)**2)
+    if est_ged > FLAGS.GED_threshold:
+        est_ged = FLAGS.GED_threshold
+
     MSE_train_dis = MSE_train_dis + ((true_ged-est_ged)**2)/100
     
 print(train_ged_cnt)
@@ -359,9 +362,14 @@ if not has_GT:
 
     
         est_ged = np.sum((code1-code2)**2)
+        if est_ged > FLAGS.GED_threshold:
+            est_ged = FLAGS.GED_threshold
+
         MSE_test_dis = MSE_test_dis + ((true_ged-est_ged)**2)/total_query_num
 else:
     for i in range(0, total_query_num, encode_batchsize):   
+
+        
         end = i + encode_batchsize
         if end > total_query_num:
             end = total_query_num
@@ -369,7 +377,9 @@ else:
         idx_list = list(range(i,end))
         while (len(idx_list) < encode_batchsize):
             idx_list.append(0)
-    
+        
+        
+
         feed_dict = construct_feed_dict_for_query(data_fetcher, 
                                                   placeholders, 
                                                   idx_list,
@@ -378,7 +388,7 @@ else:
         
         codes, embs = sess.run([model.codes, model.encode_outputs[0]], 
                                feed_dict = feed_dict)
-    
+        
     
         for j, tup in enumerate(zip(codes, embs)):
             code = tup[0]
@@ -390,11 +400,15 @@ else:
             tuple_code = tuple(code)
             q = data_fetcher.get_test_graph_gid(i + j)
 
+            ground_truth[q] = sorted(ground_truth[q], 
+                                     key=lambda x: x[1]*10000000 + x[0])
             # MSE
             idx_list = sample(range(train_graph_num), 
                               encode_batchsize)
             
             # get ground truth
+            # Use two batch when testing MSE, first one is randomly selected,
+            # the other one is the closest ones
             true_ged = []
             for idx in idx_list:
                 g = data_fetcher.get_train_graph_gid(idx)
@@ -411,7 +425,7 @@ else:
                                                        'train')
             feed_dict.update({placeholders['thres']: thres})
         
-            codes, embs = sess.run([model.codes, model.outputs[0]], 
+            codes, embs = sess.run([model.codes, model.encode_outputs[0]], 
                                    feed_dict = feed_dict)
             
             l = 0
@@ -422,15 +436,70 @@ else:
                 emb1 = np.array(emb)
                 emb2 = np.array(emb_train)    
                 est_ged = np.sum((emb1-emb2)**2)
-                MSE_test_con = MSE_test_con + ((true_ged[l]-est_ged)**2)/(total_query_num*encode_batchsize)
+                if est_ged > FLAGS.GED_threshold:
+                    est_ged = FLAGS.GED_threshold
+
+
+                MSE_test_con = MSE_test_con + ((true_ged[l]-est_ged)**2)/(total_query_num*encode_batchsize*2)
                 pred_cnt.setdefault(int(est_ged),0)
                 pred_cnt[int(est_ged)] = pred_cnt[int(est_ged)] + 1
     
                 code1 = np.array(code, dtype=np.float32)
                 code2 = np.array(code_train, dtype=np.float32)
                 est_ged = np.sum((code1-code2)**2)
-                MSE_test_dis = MSE_test_dis + ((true_ged[l]-est_ged)**2)/(total_query_num*encode_batchsize)
+                if est_ged > FLAGS.GED_threshold:
+                    est_ged = FLAGS.GED_threshold
+
+                MSE_test_dis = MSE_test_dis + ((true_ged[l]-est_ged)**2)/(total_query_num*encode_batchsize*2)
                 l = l + 1
+
+            # Second batch, the closest graphs
+            true_ged = []
+            idx_list = []
+            for pair in ground_truth[q][0:encode_batchsize]:
+                idx_list.append(data_fetcher.get_pos_by_gid(pair[0], 'train'))
+                true_ged.append(pair[1])  
+               
+            # compute code and embedding for training graphs
+            # To adjust to the size of placeholders, we add some graphs for padding
+            feed_dict = construct_feed_dict_for_encode(data_fetcher, 
+                                                       placeholders, 
+                                                       idx_list,
+                                                       'train')
+            feed_dict.update({placeholders['thres']: thres})
+        
+            codes, embs = sess.run([model.codes, model.encode_outputs[0]], 
+                                   feed_dict = feed_dict)
+            
+            l = 0
+            for code_train, emb_train in zip(codes, embs):
+                test_ged_cnt.setdefault(true_ged[l], 0)
+                test_ged_cnt[true_ged[l]] = test_ged_cnt[true_ged[l]] + 1
+
+                emb1 = np.array(emb)
+                emb2 = np.array(emb_train)    
+                est_ged = np.sum((emb1-emb2)**2)
+                if est_ged > FLAGS.GED_threshold:
+                    est_ged = FLAGS.GED_threshold
+
+
+                MSE_test_con = MSE_test_con + ((true_ged[l]-est_ged)**2)/(total_query_num*encode_batchsize*2)
+                pred_cnt.setdefault(int(est_ged),0)
+                pred_cnt[int(est_ged)] = pred_cnt[int(est_ged)] + 1
+    
+                code1 = np.array(code, dtype=np.float32)
+                code2 = np.array(code_train, dtype=np.float32)
+                est_ged = np.sum((code1-code2)**2)
+                if est_ged > FLAGS.GED_threshold:
+                    est_ged = FLAGS.GED_threshold
+
+                MSE_test_dis = MSE_test_dis + ((true_ged[l]-est_ged)**2)/(total_query_num*encode_batchsize*2)
+                l = l + 1
+
+
+
+
+
 
             if test_top_k:
                 # top k query
@@ -439,8 +508,6 @@ else:
                                                              emb,
                                                              FLAGS.top_k)
             
-                ground_truth[q] = sorted(ground_truth[q], 
-                            key=lambda x: x[1]*10000000 + x[0])
 
                 pos = FLAGS.top_k
                 while ground_truth[q][pos][1] == ground_truth[q][pos-1][1]:
@@ -510,7 +577,7 @@ else:
                     else:
                         f1_score = 2*precision*recall/(precision+recall)
             
-                f1_scores[t-1].append(f1_score)
+                    f1_scores[t-1].append(f1_score)
         
 
 print(test_ged_cnt)

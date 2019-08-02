@@ -85,7 +85,7 @@ def MSE_Loss(codes, label_1, label_2):
         A3 = tf.stack([A1 for i in range(k)], axis=1)
         
         pred_2 = tf.reduce_sum((A2-A3)**2, axis=2) 
-        pred_2 = tf.clip_by_value(pred_1, 0, FLAGS.GED_threshold)
+        pred_2 = tf.clip_by_value(pred_2, 0, FLAGS.GED_threshold)
         loss_mat_2 = (label_2 - pred_2)**2
 #        loss_2 = tf.reduce_sum(loss_mat_2)
         loss_2 = tf.reduce_mean(loss_mat_2)
