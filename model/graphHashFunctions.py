@@ -239,7 +239,7 @@ class GraphHash_Rank(GraphHash_Naive):
         self.pred = pred
         self.lab = lab
 
-class GraphHash_Rank_Reg(GraphHash_Naive):
+class GraphHash_Rank_Reg(GraphHash_Rank):
     def _loss(self):
         # Weight decay loss
         for layer_type in self.layers:
@@ -247,8 +247,14 @@ class GraphHash_Rank_Reg(GraphHash_Naive):
                 for var in layer.vars.values():
                     self.loss += FLAGS.weight_decay * tf.nn.l2_loss(var)
 
-        self.loss += MSE_Loss(self.outputs[0], 
-                              self.placeholders['labels'], 
-                              self.placeholders['generated_labels'])
+        mse_loss, pred, lab = MSE_Loss(self.outputs[0], 
+                              self.labels, 
+                              self.gen_labels)
+
+        self.loss = self.loss + mse_loss
+        self.pred = pred
+        self.lab = lab
+        self.mse_loss = mse_loss
+        
 
         self.loss += FLAGS.binary_regularizer_weight*binary_regularizer(self.outputs[0])

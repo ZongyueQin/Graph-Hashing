@@ -8,7 +8,7 @@ flags.DEFINE_float('valid_percentage', 0, 'percentage of validation set')
 flags.DEFINE_string('dataset', 'AIDS', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
 flags.DEFINE_string('model', 'gcn', 'Model string.')  # 'gcn', 'gcn_cheby', 'dense'
 flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate.')
-flags.DEFINE_integer('epochs', 5, 'Number of epochs to train.')
+flags.DEFINE_integer('epochs', 500, 'Number of epochs to train.')
 
 flags.DEFINE_integer('hidden1', 256, 'Number of units in hidden layer 1.')
 flags.DEFINE_integer('hidden2', 128, 'Number of units in hidden layer 2.')
@@ -24,7 +24,7 @@ flags.DEFINE_float('dropout', 0., 'Dropout rate (1 - keep probability).')
 flags.DEFINE_float('weight_decay', 0.00, 'Weight for L2 loss on embedding matrix.')
 flags.DEFINE_integer('early_stopping', 10, 'Tolerance for early stopping (# of epochs).')
 flags.DEFINE_float('DSH_loss_m',24,'parameter m for DSH loss')
-flags.DEFINE_float('binary_regularizer_weight',0.5,'weight for binary regularizer')
+flags.DEFINE_float('binary_regularizer_weight',5,'weight for binary regularizer')
 flags.DEFINE_float('real_data_loss_weight', 1, 'weight of real data part (loss_1) in MSE_loss')
 flags.DEFINE_float('syn_data_loss_weight', 1, 'weight of synthesized data part (loss_2) in MSE_loss')
 flags.DEFINE_float('l1_loss_w',0.0,'weight of l1 loss for codes')
