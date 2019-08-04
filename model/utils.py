@@ -93,7 +93,11 @@ def get_similar_graphs_gid(inverted_index, code, thres=FLAGS.hamming_dist_thres)
     """ use bfs to find all similar codes """
     sets = []
     frontier = [(code, 0, -1)]
+    count = 0
     while len(frontier) > 0:
+        count = count + 1
+        if count % 1000 == 0:
+            print(count)
         cur_code, dist, last_flip_pos = frontier[0]
         frontier.pop(0)
         if cur_code in inverted_index.keys():
@@ -103,7 +107,7 @@ def get_similar_graphs_gid(inverted_index, code, thres=FLAGS.hamming_dist_thres)
                 temp_code = list(cur_code)
                 temp_code[j] = bool(1-temp_code[j])
                 frontier.append((tuple(temp_code), dist+1, j))
-            
+    print(count)
     return sets
 
 def get_top_k_similar_graphs_gid(inverted_index, code, emb, top_k):
@@ -145,3 +149,32 @@ def get_top_k_similar_graphs_gid(inverted_index, code, emb, top_k):
         sorted(sets, key = func)
         sets = sets[0:top_k]
     return sets
+
+def tupleCode2IntegerCode(code):
+    ret = 0
+    curPow = 1
+    for i in range(len(code)):
+        if code[i] == True:
+            ret = ret + curPow
+        curPow = curPow * 2
+        
+    return int(ret)
+
+def writeInvertedIndex(filename, index):
+    f = open(filename, 'w')
+    f.write(str(len(index.keys()))+'\n')
+    f.write(str(FLAGS.hash_code_len)+'\n')
+    for key in index.keys():
+        code = tupleCode2IntegerCode(key)
+        f.write(str(code)+'\n')
+        f.write(str(len(index[key]))+'\n')
+        for pair in index[key]:
+            f.write(str(int(pair[0]))+'\n')
+            string = ''
+            for i in range(FLAGS.hash_code_len):
+                string = '{:s} {:f}'.format(string, pair[1][i])
+            f.write(string+'\n')
+            
+    f.close()
+            
+        
