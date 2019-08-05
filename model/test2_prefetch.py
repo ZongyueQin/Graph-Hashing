@@ -9,12 +9,9 @@ from random import randint, sample
 import numpy as np
 import os
 from scipy.stats import spearmanr, kendalltau
+import subprocess
 
-from utils import construct_input
-from utils import construct_feed_dict_for_train, construct_feed_dict_for_encode
-from utils import construct_feed_dict_for_query
-from utils import construct_feed_dict_prefetch
-from utils import get_similar_graphs_gid, get_top_k_similar_graphs_gid
+from utils import * 
 from graphHashFunctions import GraphHash_Rank_Reg
 import numpy as np
 from config import FLAGS
@@ -22,8 +19,9 @@ from DataFetcher import DataFetcher
 import pickle
 
 os.environ['CUDA_VISIBLE_DEVICES']='2'
-test_top_k = True
+test_top_k = False
 test_range_query = True
+train = True
 
 # Set random seed
 seed = 123
@@ -82,40 +80,41 @@ cost_val = []
 
 
 
-
-print('start optimization...')
-train_start = time.time()
-for epoch in range(FLAGS.epochs):
+if train == True:
+    print('start optimization...')
+    train_start = time.time()
+    for epoch in range(FLAGS.epochs):
     
-    t = time.time()
+        t = time.time()
     
-    # Construct feed dictionary
-    feed_dict = construct_feed_dict_prefetch(data_fetcher, placeholders)
-    # Training step
-    outs = sess.run([model.opt_op, model.loss], feed_dict=feed_dict)
+        # Construct feed dictionary
+        feed_dict = construct_feed_dict_prefetch(data_fetcher, placeholders)
+        # Training step
+        outs = sess.run([model.opt_op, model.loss], feed_dict=feed_dict)
     
-    if (epoch+1) % 100 == 0:
-        pred,lab = sess.run([model.pred, model.lab], feed_dict=feed_dict)
-        print(pred)
-        print(lab)
+        if (epoch+1) % 100 == 0:
+            pred,lab = sess.run([model.pred, model.lab], feed_dict=feed_dict)
+            print(pred)
+            print(lab)
     
     # No Validation For Now
 
     # Print loss
-    print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(outs[1]), 
+        print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(outs[1]), 
           "time=", "{:.5f}".format(time.time() - t))
 
 #    if epoch > FLAGS.early_stopping and cost_val[-1] > np.mean(cost_val[-(FLAGS.early_stopping+1):-1]):
 #        print("Early stopping...")
 #        break
 
-print("Optimization Finished, tiem cost {:.5f} s"\
-      .format(time.time()-train_start))
+    print("Optimization Finished, tiem cost {:.5f} s"\
+          .format(time.time()-train_start))
 
-save_path = saver.save(sess, "SavedModel/model_rank.ckpt")
-print("Model saved in path: {}".format(save_path))
-
-
+    save_path = saver.save(sess, "SavedModel/model_rank.ckpt")
+    print("Model saved in path: {}".format(save_path))
+else:
+    saver.restore(sess, "SavedModel/model_rank.ckpt")
+    raise RuntimeError('restore have bug currently')
 
 
 print('start encoding training data...')
@@ -157,6 +156,13 @@ for i, emb in enumerate(all_embs):
 index_file = open('SavedModel/inverted_index_rank.pkl', 'wb')
 pickle.dump(inverted_index, index_file)
 index_file.close()
+
+writeInvertedIndex('SavedModel/inverted_index.txt', inverted_index)
+subprocess.check_output(['./processInvertedIndex', 
+                        'SavedModel/inverted_index.txt',
+                        'SavedModel/inverted_index.index', 
+                        'SavedModel/inverted_index.value'])
+
 print('finish encoding, saved index to SavedModel/inverted_index_rank.pkl')
 
 
@@ -535,10 +541,35 @@ else:
             if test_range_query:
                 cur_pos = 0
                 for t in range(1,t_max):
-                    similar_set_wrp = get_similar_graphs_gid(inverted_index,
-                                                         tuple_code,
-                                                         t)
-                    similar_set = set([pair[0] for pair in similar_set_wrp])
+                #    similar_set_wrp = get_similar_graphs_gid(inverted_index,
+                #                                         tuple_code,
+                #                                         t)
+                #    similar_set = set([pair[0] for pair in similar_set_wrp])
+                    if FLAGS.fine_grained:
+                        ret = subprocess.check_output(['./query',
+                                                   str(tupleCode2IntegerCode(tuple_code)),
+                                                   str(t),
+                                                   'SavedModel/inverted_index.index',
+                                                   'SavedModel/inverted_index.value',
+                                                   str(len(inverted_index.keys())),
+                                                   str(train_graph_num),
+                                                   str(FLAGS.hash_code_len),
+                                                   '1'] + [str(dim) for dim in emb])
+                    else:
+                        query_time = time.time()
+                        ret = subprocess.check_output(['./query',
+                                                   str(tupleCode2IntegerCode(tuple_code)),
+                                                   str(t),
+                                                   'SavedModel/inverted_index.index',
+                                                   'SavedModel/inverted_index.value',
+                                                   str(len(inverted_index.keys())),
+                                                   str(train_graph_num),
+                                                   str(FLAGS.hash_code_len),
+                                                   '-1'])
+                        #if i + j == 0:
+#                        print('t={:d}, cost {:f} s'.format(t, time.time()-query_time))
+
+                    similar_set = set([int(gid) for gid in ret.split()])
 
                     while cur_pos < len(ground_truth[q]) and\
                           ground_truth[q][cur_pos][1] <= t:

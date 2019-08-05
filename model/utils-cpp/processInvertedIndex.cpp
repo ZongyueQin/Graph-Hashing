@@ -45,7 +45,7 @@ int main(int argc, char **argv)
 	}	
 	
 	int totalCnt, embLen;
-	size_t fileLen = 0;
+	size_t tupleCnt = 0;
 
 	fin >> totalCnt >> embLen;
 
@@ -57,7 +57,7 @@ int main(int argc, char **argv)
 		int len;
 		fin >> len;
 		invertedIndex[i].infos.resize(len);
-		fileLen += sizeof(GInfo) * len;
+		tupleCnt += len;
 		for(int j = 0; j < len; j++)
 		{
 			fin >> invertedIndex[i].infos[j].gid;
@@ -71,9 +71,15 @@ int main(int argc, char **argv)
 	sort(invertedIndex, invertedIndex + totalCnt);
 	
 	int fd1 = open(argv[2], O_CREAT|O_RDWR|O_TRUNC, 00777);
+	if (fd1 == -1)
+	{
+		fprintf(stderr, "opem: %s\n", strerror(errno));
+		return -1;
+	}
+	ftruncate(fd1, sizeof(CodePos)*totalCnt);
 
-	int *code2Pos = (int*) mmap(NULL, 2*sizeof(uint64_t)*totalCnt, 
-					PROT_WRITE, 
+	CodePos *code2Pos = (CodePos*) mmap(NULL, sizeof(CodePos)*totalCnt, 
+					PROT_WRITE|PROT_READ, 
 					MAP_SHARED,
 					fd1, 0);
 	if (code2Pos == (void *)-1)
@@ -81,13 +87,21 @@ int main(int argc, char **argv)
 		fprintf(stderr, "mmap: %s\n", strerror(errno));
 		return -1;
 	}
+	fprintf(stderr, "mmap succeed\n");
 
 	close(fd1);
 
 	int fd2 = open(argv[3], O_CREAT|O_RDWR|O_TRUNC, 00777);
-	GInfo *invertedIndexValue = (GInfo*) mmap(NULL, fileLen,
-						PROT_WRITE,
-						MAP_PRIVATE|MAP_LOCKED,
+	if (fd2 == -1)
+	{
+		fprintf(stderr, "opem: %s\n", strerror(errno));
+		return -1;
+	}
+	ftruncate(fd2, tupleCnt*sizeof(GInfo));
+
+	GInfo *invertedIndexValue = (GInfo*) mmap(NULL, tupleCnt*sizeof(GInfo),
+						PROT_WRITE|PROT_READ,
+						MAP_SHARED,
 						fd2, 0);
 	if (invertedIndexValue == (void*)-1)
 	{
@@ -95,12 +109,16 @@ int main(int argc, char **argv)
 		return -1;
 	}
 	close(fd2);
+	fprintf(stderr, "mmap succeed\n");
+
 
 	int pos = 0;
 	for(int i = 0; i < totalCnt; i++)
 	{
-		code2Pos[2*i] = invertedIndex[i].code;
-		code2Pos[2*i+1] = pos;
+//		fprintf(stderr, "%d\n", i);
+		(code2Pos+i)->code = invertedIndex[i].code;
+		(code2Pos+i)->pos = pos;
+//		fprintf(stderr, "code2pos succeed\n");
 		for(int j = 0; j < invertedIndex[i].infos.size(); j++)
 		{
 			invertedIndexValue[pos] = invertedIndex[i].infos[j];
@@ -108,7 +126,12 @@ int main(int argc, char **argv)
 		}
 	}
 
-	munmap((void*) code2Pos, 2*sizeof(uint64_t)*totalCnt);
-	munmap((void*) invertedIndexValue, fileLen);
+	fprintf(stderr, "write succees\n");
+	fprintf(stdout, "total code count: %d\n", totalCnt);
+	fprintf(stdout, "total graph count: %d\n", tupleCnt);
+	fprintf(stdout, "%d\n", code2Pos->code);
+
+	munmap((void*) code2Pos, sizeof(CodePos)*totalCnt);
+	munmap((void*) invertedIndexValue, tupleCnt * sizeof(GInfo));
 	return 0;
 }

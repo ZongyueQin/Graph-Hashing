@@ -75,13 +75,14 @@ void getAllValidCode(uint64_t code, int thres, int totalCodeCnt, int embLen, Cod
 		if (idx > -1)
 		{
 			res.push_back(idx);
+//			fprintf(stdout, "%d\n", index[idx].code);
 		}
 		if (curNode.dist < thres)
 		{
 			int pow = curNode.last_flip_pos + 1;
 			for(; pow < embLen; pow++)
 			{
-				uint64_t mask = 1 << pow;
+				uint64_t mask = (1 << pow);
 				uint64_t newCode = curNode.code ^ mask;
 				que.push(SearchNode(newCode, curNode.dist+1, pow));
 			}			
@@ -93,8 +94,12 @@ void getAllValidCode(uint64_t code, int thres, int totalCodeCnt, int embLen, Cod
 
 int main(int argc, char **argv)
 {
-	// query code thres file1 file2 totalCodeCnt totalGraphCnt embLen fine-grained embedding
-	assert(argc > 8);
+	// ./query code thres file1 file2 totalCodeCnt totalGraphCnt embLen fine-grained embedding
+	if (argc <= 8)
+	{
+		fprintf(stdout, "command format:./query code thres file1 file2 totalCodeCnt totalGraphCnt embLen fine-grained [embedding]\n");
+		return -1;
+	}
 	uint64_t queryCode = atoi(argv[1]);
 	int thres = atoi(argv[2]);	
 
@@ -134,7 +139,7 @@ int main(int argc, char **argv)
 	{
 		for(int i = 0; i < embLen; i++)
 		{
-			qInfo.emb[i] = atof(argv[i+8]);
+			qInfo.emb[i] = atof(argv[i+9]);
 		}
 	}
 
@@ -147,7 +152,7 @@ int main(int argc, char **argv)
 		int end = code2Pos[validCode[i]+1].pos;
 		for(int j = start; j < end; j++)
 		{
-			if (fine_grained > 0 && !dist(qInfo, invertedIndexValue[j], embLen) > (double)thres)
+			if (fine_grained > 0 && dist(qInfo, invertedIndexValue[j], embLen) > (double)thres)
 			{
 				continue;
 			}
