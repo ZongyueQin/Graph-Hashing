@@ -240,6 +240,34 @@ class GraphHash_Rank(GraphHash_Naive):
         self.lab = lab
 
 class GraphHash_Rank_Reg(GraphHash_Rank):
+    def __init__(self, placeholders, input_dim, next_ele, **kwargs):
+        super(GraphHash_Naive, self).__init__(**kwargs)
+
+        self.graph_embs = []
+        self.inputs = [next_ele[0], next_ele[1], next_ele[2]]
+        self.labels = next_ele[3]
+        self.gen_labels = None
+        if FLAGS.label_type == 'ged':
+            self.gen_labels = next_ele[4]
+            
+        self.input_dim = input_dim
+        # self.input_dim = self.inputs.get_shape().as_list()[1]  # To be supported in future Tensorflow versions
+        self.output_dim = FLAGS.hash_code_len
+        self.placeholders = placeholders
+
+        if 'binary_reg_w' in placeholders.keys():
+            print('auto increasing binary regularizer weight')
+            self.binary_reg_w = placeholders['binary_reg_w']
+        else:
+            self.binary_reg_w = FLAGS.binary_regularizer_weight
+
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate)
+
+        self.build()
+        
+        self.build_encode()
+
+
     def _loss(self):
         # Weight decay loss
         for layer_type in self.layers:
@@ -256,5 +284,6 @@ class GraphHash_Rank_Reg(GraphHash_Rank):
         self.lab = lab
         self.mse_loss = mse_loss
         
+        self.binary_reg_loss = binary_regularizer(self.outputs[0])
 
-        self.loss += FLAGS.binary_regularizer_weight*binary_regularizer(self.outputs[0])
+        self.loss += self.binary_reg_w * self.binary_reg_loss

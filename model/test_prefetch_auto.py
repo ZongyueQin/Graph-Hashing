@@ -18,7 +18,7 @@ from config import FLAGS
 from DataFetcher import DataFetcher
 import pickle
 
-os.environ['CUDA_VISIBLE_DEVICES']='6'
+os.environ['CUDA_VISIBLE_DEVICES']='2'
 test_top_k = False
 test_range_query = True
 train = True
@@ -60,7 +60,8 @@ placeholders = {
 #    'num_features_nonzero': tf.placeholder(tf.int32),  # helper variable for sparse dropout
     'graph_sizes': tf.placeholder(tf.int32, shape=((1+FLAGS.k)*FLAGS.batchsize)),
     'generated_labels':tf.placeholder(tf.float32, shape=(FLAGS.batchsize, FLAGS.k)),
-    'thres':tf.placeholder(tf.float32, shape=(FLAGS.hash_code_len))
+    'thres':tf.placeholder(tf.float32, shape=(FLAGS.hash_code_len)),
+    'binary_reg_w':tf.placeholder(tf.float32, shape=())
 }
 
 
@@ -78,20 +79,46 @@ sess.run(tf.global_variables_initializer())
 saver = tf.train.Saver()
 cost_val = []
 
+past_loss = []
+past_reg_loss = []
+epoch_since_last_update = 0
 
+last_n_loss = []
 
 if train == True:
     print('start optimization...')
     train_start = time.time()
+    binary_reg_w = FLAGS.binary_regularizer_weight
     for epoch in range(FLAGS.epochs):
     
         t = time.time()
     
         # Construct feed dictionary
         feed_dict = construct_feed_dict_prefetch(data_fetcher, placeholders)
+        feed_dict.update({placeholders['binary_reg_w']: binary_reg_w})
         # Training step
-        outs = sess.run([model.opt_op, model.loss], feed_dict=feed_dict)
+        outs = sess.run([model.opt_op, model.loss, model.binary_reg_loss], feed_dict=feed_dict)
     
+        past_loss.append(outs[1])
+        past_reg_loss.append(outs[2])
+        epoch_since_last_update = epoch_since_last_update + 1
+        last_n_loss.append(outs[1])
+        if len(last_n_loss) > FLAGS.last_n:
+            last_n_loss.pop(0)
+
+        if epoch_since_last_update > FLAGS.early_stopping and\
+           np.mean(last_n_loss) > np.mean(past_loss[-(FLAGS.early_stopping+1):-1]):
+            if np.mean(past_reg_loss[-(FLAGS.early_stopping+1):-1]) < 0.1:
+                print('early stopping after %d iterations'%epoch)
+                break
+            else:
+                binary_reg_w = binary_reg_w * FLAGS.BRW_increase_rate
+                if binary_reg_w < FLAGS.MAX_BRW:
+                    print('update w for regularizer to %.5f'%binary_reg_w)
+                else:
+                    binary_reg_w = FLAGS.MAX_BRW
+                epoch_since_last_update = 0
+
         if (epoch+1) % 100 == 0:
             pred,lab = sess.run([model.pred, model.lab], feed_dict=feed_dict)
             print(pred)
@@ -100,7 +127,8 @@ if train == True:
     # No Validation For Now
 
     # Print loss
-        print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(outs[1]), 
+        print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(outs[1]),
+          "binary_reg=", "{:.5f}".format(outs[2]), 
           "time=", "{:.5f}".format(time.time() - t))
 
 #    if epoch > FLAGS.early_stopping and cost_val[-1] > np.mean(cost_val[-(FLAGS.early_stopping+1):-1]):
@@ -109,6 +137,7 @@ if train == True:
 
     print("Optimization Finished, tiem cost {:.5f} s"\
           .format(time.time()-train_start))
+    print("final binary_reg_w=%d"%binary_reg_w)
 
     save_path = saver.save(sess, "SavedModel/model_rank.ckpt")
     print("Model saved in path: {}".format(save_path))
@@ -304,10 +333,6 @@ precisions = [[] for i in range(t_max)]
 recalls = [[] for i in range(t_max)]
 f1_scores = [[] for i in range(t_max)]
 zero_cnt = [0 for i in range(t_max)]
-
-precisions_nz = [[] for i in range(t_max)]
-recalls_nz = [[] for i in range(t_max)]
-f1_scores_nz = [[] for i in range(t_max)]
 
 MSE_test_con = 0
 MSE_test_dis = 0
@@ -592,8 +617,6 @@ else:
                         precision =  len(tmp)/len(similar_set)
             
                     precisions[t-1].append(precision)
-                    if len(real_sim_set) > 0:
-                        precisions_nz[t-1].append(precision)
 
                     if len(real_sim_set) == 0:
                         zero_cnt[t-1] = zero_cnt[t-1] + 1
@@ -604,8 +627,6 @@ else:
                     else:
                         recall = len(tmp)/len(real_sim_set)
                     recalls[t-1].append(recall)
-                    if len(real_sim_set) > 0:
-                        recalls_nz[t-1].append(recall)
           
                     if precision * recall == 0:
                         if len(real_sim_set) == 0 and\
@@ -617,8 +638,7 @@ else:
                         f1_score = 2*precision*recall/(precision+recall)
             
                     f1_scores[t-1].append(f1_score)
-                    if len(real_sim_set) > 0:
-                        f1_scores_nz[t-1].append(f1_score)
+        
 
 print(test_ged_cnt)
 print(pred_cnt)
@@ -634,18 +654,11 @@ if test_top_k:
 if test_range_query:
     print('For range query')
     for t in range(1,t_max):
-        print('threshold = {:d}'.format(t), end=' ')    
-        print('empty cnt = {:d}'.format(zero_cnt[t-1]), end = ' ')
-        print('average precision = %f'%(sum(precisions[t-1])/len(precisions[t-1])), end = ' ')
-        print('average recall = %f'%(sum(recalls[t-1])/len(recalls[t-1])), end = ' ')
+        print('threshold = {:d}'.format(t))    
+        print('empty cnt = {:d}'.format(zero_cnt[t-1]))
+        print('average precision = %f'%(sum(precisions[t-1])/len(precisions[t-1])))
+        print('average recall = %f'%(sum(recalls[t-1])/len(recalls[t-1])))
         print('average f1-score = %f'%(sum(f1_scores[t-1])/len(f1_scores[t-1])))
-
-    print('ignore empty answers') 
-    for t in range(1,t_max):
-        print('threshold = {:d}'.format(t), end = ' ')    
-        print('average precision = %f'%(sum(precisions_nz[t-1])/len(precisions_nz[t-1])), end = ' ')
-        print('average recall = %f'%(sum(recalls_nz[t-1])/len(recalls_nz[t-1])), end = ' ')
-        print('average f1-score = %f'%(sum(f1_scores_nz[t-1])/len(f1_scores_nz[t-1])))
                 
     print(ged_cnt)
     print('FLAGS.k={:d}'.format(FLAGS.k))
