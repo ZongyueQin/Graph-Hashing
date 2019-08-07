@@ -160,10 +160,10 @@ def tupleCode2IntegerCode(code):
         
     return int(ret)
 
-def writeInvertedIndex(filename, index):
+def writeInvertedIndex(filename, index, embLen = FLAGS.hash_code_len):
     f = open(filename, 'w')
     f.write(str(len(index.keys()))+'\n')
-    f.write(str(FLAGS.hash_code_len)+'\n')
+    f.write(str(embLen)+'\n')
     for key in index.keys():
         code = tupleCode2IntegerCode(key)
         f.write(str(code)+'\n')
@@ -171,7 +171,7 @@ def writeInvertedIndex(filename, index):
         for pair in index[key]:
             f.write(str(int(pair[0]))+'\n')
             string = ''
-            for i in range(FLAGS.hash_code_len):
+            for i in range(embLen):
                 string = '{:s} {:f}'.format(string, pair[1][i])
             f.write(string+'\n')
             

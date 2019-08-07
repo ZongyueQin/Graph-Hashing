@@ -19,7 +19,7 @@ struct CodePos
 struct GInfo
 {
 	uint64_t gid;
-	double emb[64];
+	double emb[300];
 };
 
 class InvertedIndexEntry

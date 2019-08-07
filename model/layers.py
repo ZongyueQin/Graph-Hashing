@@ -126,11 +126,17 @@ class Dense(Layer):
         # transform
         with tf.variable_scope(self.name + '_vars'):
             # dropout
-            weights = tf.nn.dropout(self.vars['weights'], 
+            if self.dropout:
+                weights = tf.nn.dropout(self.vars['weights'], 
                                     1 - self.dropout)
-            if self.bias:
-                bias = tf.nn.dropout(self.vars['bias'], 
+                if self.bias:
+                    bias = tf.nn.dropout(self.vars['bias'], 
                                      1 - self.dropout)
+            else:
+                weights = self.vars['weights']
+                if self.bias:
+                    bias = self.vars['bias']
+
 
             output = dot(x, weights, sparse=self.sparse_inputs)
 
@@ -183,14 +189,19 @@ class GraphConvolution_GCN(Layer):
 
         # convolve
         with tf.variable_scope(self.name + '_vars'):
+            if self.dropout:
             # dropout
-            weights = tf.nn.dropout(self.vars['weights'], 
+                weights = tf.nn.dropout(self.vars['weights'], 
                                     1 - self.dropout)
-            if self.bias:
-                bias = tf.nn.dropout(self.vars['bias'], 
+                if self.bias:
+                    bias = tf.nn.dropout(self.vars['bias'], 
                                      1 - self.dropout)
 
-            
+            else:
+                weights = self.vars['weights']
+                if self.bias:
+                    bias = self.vars['bias']
+
             if not self.featureless:
                 pre_sup = dot(x, 
                               weights,
@@ -256,12 +267,18 @@ class SplitAndAttentionPooling(Layer):
         graph_emb_list = []
         
         with tf.variable_scope(self.name + '_vars'):
+            if self.dropout:
             # dropout
-            weights = tf.nn.dropout(self.vars['weights'], 
+                weights = tf.nn.dropout(self.vars['weights'], 
                                     1 - self.dropout)
-            if self.bias:
-                bias = tf.nn.dropout(self.vars['bias'], 
+                if self.bias:
+                    bias = tf.nn.dropout(self.vars['bias'], 
                                      1 - self.dropout)
+            else:
+                weights = self.vars['weights']
+                if self.bias:
+                    bias = self.vars['bias']
+
 
             for features in features_list:
                 # Generate a graph embedding per graphs

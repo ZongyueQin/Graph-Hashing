@@ -46,16 +46,14 @@ class DataFetcher:
         #train_graphs = train_graphs[0:FLAGS.batchsize*(1+FLAGS.k)]
 
         test_graphs = self._readGraphs(self.test_data_dir)
-        shuffle(test_graphs)
-        train_graphs, valid_graphs = self._split_train_valid(train_graphs)
         
         self.node_feat_encoder = self._create_node_feature_encoder(
-            train_graphs + valid_graphs + test_graphs)
+            train_graphs + test_graphs)
 
         self.train_graphs = self.create_wrapper_graph(train_graphs, 'train')
-        self.valid_graphs = self.create_wrapper_graph(valid_graphs, 'valid')
         self.test_graphs = self.create_wrapper_graph(test_graphs, 'test')
-
+        
+        self.train_graphs, self.valid_graphs = self._split_train_valid(self.train_graphs)
         # pointers help to sample graphs
         self.cur_train_sample_ptr = 0
         self.cur_valid_sample_ptr = 0
@@ -208,7 +206,13 @@ class DataFetcher:
         #    print('without label')
         #    print(target_list[idx].nxgraph.graph['gid'])
             graphs.append(target_list[idx])
-        
+            """
+            gg = target_list[idx]
+            print(gg.nxgraph.graph['gid'])
+            print(gg.sparse_node_inputs)
+            print(gg.laplacian)
+            """
+
         features = sp.vstack([g.sparse_node_inputs for g in graphs])
         features = self._sparse_to_tuple(features)
         
@@ -639,7 +643,7 @@ class NodeFeatureOneHotEncoder(NodeFeatureEncoder):
         inputs_set = set()
         for g in gs:
             inputs_set = inputs_set | set(self._node_feat_dic(g).values())
-        self.feat_idx_dic = {feat: idx for idx, feat in enumerate(inputs_set)}
+        self.feat_idx_dic = {feat: idx for idx, feat in enumerate(sorted(list(inputs_set)))}
         self._fit_onehotencoder()
 
     def _fit_onehotencoder(self):

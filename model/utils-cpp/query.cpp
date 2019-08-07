@@ -14,6 +14,7 @@
 #include <string.h>
 #include <queue>
 
+
 using namespace std;
 
 class SearchNode
@@ -77,7 +78,11 @@ void getAllValidCode(uint64_t code, int thres, int totalCodeCnt, int embLen, Cod
 			res.push_back(idx);
 //			fprintf(stdout, "%d\n", index[idx].code);
 		}
+#ifdef LOOSE
+		if (curNode.dist <= thres)
+#else
 		if (curNode.dist < thres)
+#endif
 		{
 			int pow = curNode.last_flip_pos + 1;
 			for(; pow < embLen; pow++)
@@ -94,8 +99,8 @@ void getAllValidCode(uint64_t code, int thres, int totalCodeCnt, int embLen, Cod
 
 int main(int argc, char **argv)
 {
-	// ./query code thres file1 file2 totalCodeCnt totalGraphCnt embLen fine-grained embedding
-	if (argc <= 8)
+	// ./query code thres file1 file2 totalCodeCnt totalGraphCnt codeLen embLen fine-grained embedding
+	if (argc <= 9)
 	{
 		fprintf(stdout, "command format:./query code thres file1 file2 totalCodeCnt totalGraphCnt embLen fine-grained [embedding]\n");
 		return -1;
@@ -132,19 +137,20 @@ int main(int argc, char **argv)
 	}
 	close(fd2);
 
-	int embLen = atoi(argv[7]); 
+        int codeLen = atoi(argv[7]);
+	int embLen = atoi(argv[8]); 
 	GInfo qInfo;
-	int fine_grained = atoi(argv[8]);
+	int fine_grained = atoi(argv[9]);
 	if (fine_grained > 0)
 	{
 		for(int i = 0; i < embLen; i++)
 		{
-			qInfo.emb[i] = atof(argv[i+9]);
+			qInfo.emb[i] = atof(argv[i+10]);
 		}
 	}
 
 	vector <uint64_t> validCode;
-	getAllValidCode(queryCode, thres, totalCodeCnt, embLen, code2Pos, validCode);
+	getAllValidCode(queryCode, thres, totalCodeCnt, codeLen, code2Pos, validCode);
 
 	for(int i = 0; i < validCode.size(); i++)
 	{

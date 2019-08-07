@@ -10,23 +10,28 @@ import numpy as np
 import os
 from scipy.stats import spearmanr, kendalltau
 import subprocess
+from tensorflow.python.tools import inspect_checkpoint as chkp
+import sys
 
-from utils import * 
-from graphHashFunctions import GraphHash_Rank_Reg
+
+from utils import *
+from graphHashFunctions import GraphHash_Emb_Code
 import numpy as np
 from config import FLAGS
 from DataFetcher import DataFetcher
 import pickle
 
-os.environ['CUDA_VISIBLE_DEVICES']='6'
+os.environ['CUDA_VISIBLE_DEVICES']='4,5'
 test_top_k = False
 test_range_query = True
-train = True
 
 # Set random seed
 seed = 123
 np.random.seed(seed)
 tf.set_random_seed(seed)
+
+#chkp.print_tensors_in_checkpoint_file("SavedModel/model_rank.ckpt", tensor_name='', all_tensors=True, all_tensor_names=True)
+
 
 
 # Load data
@@ -66,7 +71,7 @@ placeholders = {
 
 
 # Create model
-model = GraphHash_Rank_Reg(placeholders, 
+model = GraphHash_Emb_Code(placeholders, 
                        input_dim=data_fetcher.get_node_feature_dim(),
                        next_ele = next_element,
                        logging=True)
@@ -74,53 +79,54 @@ model = GraphHash_Rank_Reg(placeholders,
 sess = tf.Session()
 
 # Init variables
-sess.run(tf.global_variables_initializer())
 saver = tf.train.Saver()
 cost_val = []
 
 
-
-if train == True:
-    print('start optimization...')
-    train_start = time.time()
-    for epoch in range(FLAGS.epochs):
+print('start optimization...')
+sess.run(tf.global_variables_initializer())
+train_start = time.time()
+for epoch in range(FLAGS.epochs):
     
-        t = time.time()
+    t = time.time()
     
-        # Construct feed dictionary
-        feed_dict = construct_feed_dict_prefetch(data_fetcher, placeholders)
-        # Training step
-        outs = sess.run([model.opt_op, model.loss], feed_dict=feed_dict)
+    # Construct feed dictionary
+    feed_dict = construct_feed_dict_prefetch(data_fetcher, placeholders)
+    # Training step
+    outs = sess.run([model.opt_op, model.loss], feed_dict=feed_dict)
     
-        if (epoch+1) % 100 == 0:
-            pred,lab = sess.run([model.pred, model.lab], feed_dict=feed_dict)
-            print(pred)
-            print(lab)
+    if (epoch+1) % 100 == 0:
+        pred,lab = sess.run([model.pred, model.lab], feed_dict=feed_dict)
+        print(pred)
+        print(lab)
     
     # No Validation For Now
 
     # Print loss
-        print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(outs[1]), 
+    print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(outs[1]), 
           "time=", "{:.5f}".format(time.time() - t))
 
 #    if epoch > FLAGS.early_stopping and cost_val[-1] > np.mean(cost_val[-(FLAGS.early_stopping+1):-1]):
 #        print("Early stopping...")
 #        break
 
-    print("Optimization Finished, tiem cost {:.5f} s"\
-          .format(time.time()-train_start))
+print("Optimization Finished, tiem cost {:.5f} s"\
+      .format(time.time()-train_start))
 
-    save_path = saver.save(sess, "SavedModel/model_rank.ckpt")
-    print("Model saved in path: {}".format(save_path))
-else:
-    saver.restore(sess, "SavedModel/model_rank.ckpt")
-    raise RuntimeError('restore have bug currently')
+save_path = saver.save(sess, "SavedModel/model_rank.ckpt")
+print("Model saved in path: {}".format(save_path))
+
+"""
+saver.restore(sess, "SavedModel/model_rank.ckpt")
+"""
+
 
 
 print('start encoding training data...')
 train_graph_num = data_fetcher.get_train_graphs_num()
 inverted_index = {}
 encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
+all_codes = []
 all_embs = []
 
 for i in range(0, train_graph_num, encode_batchsize):
@@ -136,18 +142,24 @@ for i in range(0, train_graph_num, encode_batchsize):
                                                placeholders, 
                                                idx_list,
                                                'train')
-    embs = sess.run(model.encode_outputs[0], 
-                    feed_dict = feed_dict)
+    codes, embs = sess.run([model.encode_outputs[0],
+                            model.ecd_embeddings[0]], 
+                            feed_dict = feed_dict)
+    codes = list(codes)
+    codes = codes[0:end-i]
+    all_codes = all_codes + codes
+    
     embs = list(embs)
     embs = embs[0:end-i]
     all_embs = all_embs + embs
     
-all_embs_np = np.array(all_embs)
-thres = np.median(all_embs_np, axis=0)
-#thres = 0.5 * np.ones(FLAGS.hash_code_len)
+all_codes_np = np.array(all_codes)
+thres = np.median(all_codes_np, axis=0)
 id2emb = {}
-for i, emb in enumerate(all_embs):
-    code = (np.array(emb) > thres).tolist()
+for i, pair in enumerate(zip(all_codes, all_embs)):
+    code = pair[0]
+    emb = pair[1]
+    code = (np.array(code) > thres).tolist()
     tuple_code = tuple(code)
     gid = data_fetcher.get_train_graph_gid(i)
     inverted_index.setdefault(tuple_code, [])
@@ -157,17 +169,14 @@ for i, emb in enumerate(all_embs):
 index_file = open('SavedModel/inverted_index_rank.pkl', 'wb')
 pickle.dump(inverted_index, index_file)
 index_file.close()
-
-writeInvertedIndex('SavedModel/inverted_index.txt', inverted_index)
+writeInvertedIndex('SavedModel/inverted_index.txt', inverted_index, FLAGS.embedding_dim)
 subprocess.check_output(['./processInvertedIndex', 
                         'SavedModel/inverted_index.txt',
                         'SavedModel/inverted_index.index', 
                         'SavedModel/inverted_index.value'])
 
 print('finish encoding, saved index to SavedModel/inverted_index_rank.pkl')
-
-
-
+ 
 
 # Compute MSE of estimated GED for training data
 print('Computing training MSE...')
@@ -216,30 +225,27 @@ for i in range(100):
     #print(true_ged)
     train_ged_cnt.setdefault(true_ged, 0)
     train_ged_cnt[true_ged] = train_ged_cnt[true_ged] + 1
-    idx_list = [idx1, idx2]
+#    idx_list = [idx1, idx2]
+
+
     while (len(idx_list) < encode_batchsize):
         idx_list.append(0)
+
     feed_dict = construct_feed_dict_for_encode(data_fetcher, 
                                                placeholders, 
                                                idx_list,
                                                'train')
     feed_dict.update({placeholders['thres']: thres})
-    codes, embs,var = sess.run([model.codes, model.encode_outputs[0],
-                            model.layers[0][0].vars['weights']], 
+    codes, embs, inputs, act = sess.run([model.codes, model.ecd_embeddings[0], model.ecd_inputs, model.ecd_activations], 
                           feed_dict = feed_dict)
-    #print('var')
-    #print(var)
     emb1 = np.array(embs[0])
     emb2 = np.array(embs[1])
-    #gid1 = data_fetcher.get_train_graph_gid(idx1)
-    #gid2 = data_fetcher.get_train_graph_gid(idx2)
-    #print(emb1)
-    #print(id2emb[gid1])
-    #print(emb2)
-    #print(id2emb[gid2])
+    """
+    df = open('tmp1', 'wb')
+    pickle.dump([inputs, act], df)
+    """
     est_ged = np.sum((emb1-emb2)**2)
-    #print(est_ged)
-    #break
+
     if est_ged > FLAGS.GED_threshold:
         est_ged = FLAGS.GED_threshold
     pred_cnt.setdefault(int(est_ged),0)
@@ -254,6 +260,8 @@ for i in range(100):
 
     MSE_train_dis = MSE_train_dis + ((true_ged-est_ged)**2)/100
     
+
+
 print(train_ged_cnt)
 print(pred_cnt)
 print('MSE for training (continuous) = {:f}'.format(MSE_train_con))
@@ -310,6 +318,7 @@ precisions_nz = [[] for i in range(t_max)]
 recalls_nz = [[] for i in range(t_max)]
 f1_scores_nz = [[] for i in range(t_max)]
 
+
 MSE_test_con = 0
 MSE_test_dis = 0
 test_ged_cnt = {}
@@ -338,7 +347,7 @@ if not has_GT:
                                                    'test')
         feed_dict.update({placeholders['thres']: thres})
     
-        codes, embs = sess.run([model.codes, model.encode_outputs[0]], 
+        codes, embs = sess.run([model.codes, model.ecd_embeddings[0]], 
                                feed_dict = feed_dict)
         emb1 = np.array(embs[0])
         code1 = codes[0]
@@ -355,7 +364,7 @@ if not has_GT:
                                                    'train')
         feed_dict.update({placeholders['thres']: thres})
 
-        codes, embs = sess.run([model.codes, model.encode_outputs[0]], 
+        codes, embs = sess.run([model.codes, model.ecd_embeddings[0]], 
                                feed_dict = feed_dict)
         emb2 = np.array(embs[0])
         code2 = codes[0]
@@ -397,8 +406,8 @@ else:
                                                   'test')
         feed_dict.update({placeholders['thres']: thres})
         
-        codes, embs = sess.run([model.codes, model.encode_outputs[0]], 
-                               feed_dict = feed_dict)
+        codes, embs = sess.run([model.codes, model.ecd_embeddings[0]], 
+                                   feed_dict = feed_dict)
         
     
         for j, tup in enumerate(zip(codes, embs)):
@@ -436,7 +445,7 @@ else:
                                                        'train')
             feed_dict.update({placeholders['thres']: thres})
         
-            codes, embs = sess.run([model.codes, model.encode_outputs[0]], 
+            codes, embs = sess.run([model.codes, model.ecd_embeddings[0]], 
                                    feed_dict = feed_dict)
             
             l = 0
@@ -479,7 +488,7 @@ else:
                                                        'train')
             feed_dict.update({placeholders['thres']: thres})
         
-            codes, embs = sess.run([model.codes, model.encode_outputs[0]], 
+            codes, embs = sess.run([model.codes, model.ecd_embeddings[0]], 
                                    feed_dict = feed_dict)
             
             l = 0
@@ -546,10 +555,7 @@ else:
             if test_range_query:
                 cur_pos = 0
                 for t in range(1,t_max):
-                #    similar_set_wrp = get_similar_graphs_gid(inverted_index,
-                #                                         tuple_code,
-                #                                         t)
-                #    similar_set = set([pair[0] for pair in similar_set_wrp])
+                    
                     query_time = time.time()
                     if FLAGS.fine_grained:
                         ret = subprocess.check_output(['./query',
@@ -560,7 +566,7 @@ else:
                                                    str(len(inverted_index.keys())),
                                                    str(train_graph_num),
                                                    str(FLAGS.hash_code_len),
-                                                   str(FLAGS.hash_code_len),
+                                                   str(FLAGS.embedding_dim),
                                                    '1'] + [str(dim) for dim in emb])
                     else:
                         ret = subprocess.check_output(['./query',
@@ -570,8 +576,8 @@ else:
                                                    'SavedModel/inverted_index.value',
                                                    str(len(inverted_index.keys())),
                                                    str(train_graph_num),
-                                                   str(FLAGS.hash_code_len),
-                                                   str(FLAGS.hash_code_len),
+                                                   str(FALGS.hash_code_len),
+                                                   str(FLAGS.embedding_dim),
                                                    '-1'])
                     if i + j == 0:
                         print('t={:d}, cost {:f} s'.format(t, time.time()-query_time))
@@ -593,7 +599,7 @@ else:
                             precision = 0
                     else:
                         precision =  len(tmp)/len(similar_set)
-            
+
                     precisions[t-1].append(precision)
                     if len(real_sim_set) > 0:
                         precisions_nz[t-1].append(precision)
@@ -609,7 +615,7 @@ else:
                     recalls[t-1].append(recall)
                     if len(real_sim_set) > 0:
                         recalls_nz[t-1].append(recall)
-          
+
                     if precision * recall == 0:
                         if len(real_sim_set) == 0 and\
                             len(similar_set) == 0:
@@ -618,7 +624,7 @@ else:
                             f1_score = 0
                     else:
                         f1_score = 2*precision*recall/(precision+recall)
-            
+
                     f1_scores[t-1].append(f1_score)
                     if len(real_sim_set) > 0:
                         f1_scores_nz[t-1].append(f1_score)
@@ -637,18 +643,20 @@ if test_top_k:
 if test_range_query:
     print('For range query')
     for t in range(1,t_max):
-        print('threshold = {:d}'.format(t), end=' ')    
+        print('threshold = {:d}'.format(t), end=' ')
         print('empty cnt = {:d}'.format(zero_cnt[t-1]), end = ' ')
         print('average precision = %f'%(sum(precisions[t-1])/len(precisions[t-1])), end = ' ')
         print('average recall = %f'%(sum(recalls[t-1])/len(recalls[t-1])), end = ' ')
         print('average f1-score = %f'%(sum(f1_scores[t-1])/len(f1_scores[t-1])))
 
-    print('ignore empty answers') 
+    print('ignore empty answers')
     for t in range(1,t_max):
-        print('threshold = {:d}'.format(t), end = ' ')    
+        print('threshold = {:d}'.format(t), end = ' ')
         print('average precision = %f'%(sum(precisions_nz[t-1])/len(precisions_nz[t-1])), end = ' ')
         print('average recall = %f'%(sum(recalls_nz[t-1])/len(recalls_nz[t-1])), end = ' ')
         print('average f1-score = %f'%(sum(f1_scores_nz[t-1])/len(f1_scores_nz[t-1])))
-                
+
     print(ged_cnt)
     print('FLAGS.k={:d}'.format(FLAGS.k))
+
+
