@@ -516,3 +516,28 @@ class GraphHash_Emb_Code(GraphHash_Rank):
         self.loss += FLAGS.binary_regularizer_weight*\
                     binary_regularizer(self.outputs[0])
     
+
+class GraphHash_Emb_Code_Binary(GraphHash_Emb_Code):
+    def _loss(self):
+        for layer_type in self.layers:
+            for layer in layer_type:
+                for var in layer.vars.values():
+                    self.loss += FLAGS.weight_decay * tf.nn.l2_loss(var)
+
+        emb_mse_loss, _, _ = MSE_Loss(self.embeddings[0], 
+                              self.labels, 
+                              self.gen_labels)
+
+
+        code_mse_loss, pred, lab = DSH_Loss(self.outputs[0], 
+                                            self.labels, 
+                                            self.gen_labels)
+
+        self.loss = self.loss + code_mse_loss + emb_mse_loss
+        self.pred = pred
+        self.lab = lab
+        self.code_mse_loss = code_mse_loss
+        self.emb_mse_loss = emb_mse_loss
+
+        self.loss += FLAGS.binary_regularizer_weight*\
+                    binary_regularizer(self.outputs[0])

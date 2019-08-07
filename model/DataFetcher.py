@@ -143,16 +143,7 @@ class DataFetcher:
         # get size of each graph
         sizes = [g.nxgraph.number_of_nodes() for g in self.sample_graphs]         
         
-        if FLAGS.label_type == 'binary':
-            return features, laplacians, sizes, tf.convert_to_tensor(self.labels)
-        elif FLAGS.label_type == 'ged':
-            return features,\
-                   laplacians,\
-                   sizes,\
-                   self.labels,\
-                   generated_labels
-        else:
-            raise RuntimeError('Unrecognized label type: '+FLAGS.label_type)
+        return features, laplacians, sizes, self.labels, generated_labels
         
     """ sample train_graphs and compute label between each pair of graphs """
     def sample_train_graphs_and_compute_label(self, batchsize):
@@ -365,8 +356,13 @@ class DataFetcher:
         for fname in fnames:
             os.remove(fname)
         
-        return geds
-        
+        if FLAGS.label_type == 'ged':
+            return geds
+        elif FLAGS.label_type == 'binary':
+            labels = geds < FLAGS.GED_threshold
+            return labels.astype(float)
+        else:
+            raise RuntimeError('Unrecognized label type: {:s}'.format(FLAGS.label_type))
 
     def getLabelForPair(self, g1, g2):
         
@@ -450,7 +446,12 @@ class DataFetcher:
             # sample how many edit operation to perform
             op_num = randint(1,FLAGS.GED_threshold-2)
             # though not accurate, may be good enough
-            geds.append(op_num)
+            if FLAGS.label_type == 'ged':
+                geds.append(op_num)
+            elif FLAGS.label_type == 'binary':
+                geds.append(1)
+            else:
+                raise RuntimeError('Unrecognized label type: {:s}'.format(FLAGS.label_type))
             j = 0
             op_cannot_be_1 = False
             op_cannot_be_2 = False
