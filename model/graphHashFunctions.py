@@ -168,7 +168,7 @@ class GraphHash_Naive(Model):
 
 class GraphHash_Rank(GraphHash_Naive):
     def __init__(self, placeholders, input_dim, next_ele, **kwargs):
-        super(Model, self).__init__(**kwargs)
+        super(GraphHash_Rank, self).__init__(**kwargs)
 
         self.graph_embs = []
         self.inputs = [next_ele[0], next_ele[1], next_ele[2]]
