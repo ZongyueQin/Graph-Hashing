@@ -7,7 +7,7 @@ from config import FLAGS
 
 class GraphHash_Naive(Model):
     def __init__(self, placeholders, input_dim, **kwargs):
-        super(GraphHash_Naive, self).__init__(**kwargs)
+        super(Model, self).__init__(**kwargs)
 
         self.graph_embs = []
         self.inputs = [placeholders['features'], placeholders['support'],
@@ -168,7 +168,7 @@ class GraphHash_Naive(Model):
 
 class GraphHash_Rank(GraphHash_Naive):
     def __init__(self, placeholders, input_dim, next_ele, **kwargs):
-        super(GraphHash_Naive, self).__init__(**kwargs)
+        super(Model, self).__init__(**kwargs)
 
         self.graph_embs = []
         self.inputs = [next_ele[0], next_ele[1], next_ele[2]]
@@ -241,7 +241,7 @@ class GraphHash_Rank(GraphHash_Naive):
 
 class GraphHash_Rank_Reg(GraphHash_Rank):
     def __init__(self, placeholders, input_dim, next_ele, **kwargs):
-        super(GraphHash_Naive, self).__init__(**kwargs)
+        super(Model, self).__init__(**kwargs)
 
         self.graph_embs = []
         self.inputs = [next_ele[0], next_ele[1], next_ele[2]]
@@ -290,16 +290,14 @@ class GraphHash_Rank_Reg(GraphHash_Rank):
 
 
 
-class GraphHash_Emb_Code(GraphHash_Rank):
+class GraphHash_Emb_Code(Model):
     def __init__(self, placeholders, input_dim, next_ele, **kwargs):
-        super(GraphHash_Naive, self).__init__(**kwargs)
+        super(GraphHash_Emb_Code, self).__init__(**kwargs)
 
         self.graph_embs = []
         self.inputs = [next_ele[0], next_ele[1], next_ele[2]]
         self.labels = next_ele[3]
-        self.gen_labels = None
-        if FLAGS.label_type == 'ged':
-            self.gen_labels = next_ele[4]
+        self.gen_labels = next_ele[4]
             
         self.input_dim = input_dim
         # self.input_dim = self.inputs.get_shape().as_list()[1]  # To be supported in future Tensorflow versions
@@ -515,10 +513,20 @@ class GraphHash_Emb_Code(GraphHash_Rank):
 
         self.loss += FLAGS.binary_regularizer_weight*\
                     binary_regularizer(self.outputs[0])
+
+    def _accuracy(self):
+        pass
     
 
 class GraphHash_Emb_Code_Binary(GraphHash_Emb_Code):
+#    def __init__(self, placeholders, input_dim, next_ele, **kwargs):
+#        super(GraphHash_Emb_Code, self).__init__(placeholders, input_dim, next_ele, **kwargs)
+
+
+
     def _loss(self):
+        self.loss = 0
+
         for layer_type in self.layers:
             for layer in layer_type:
                 for var in layer.vars.values():
@@ -530,8 +538,7 @@ class GraphHash_Emb_Code_Binary(GraphHash_Emb_Code):
 
 
         code_mse_loss, pred, lab = DSH_Loss(self.outputs[0], 
-                                            self.labels, 
-                                            self.gen_labels)
+                                            self.labels)
 
         self.loss = self.loss + code_mse_loss + emb_mse_loss
         self.pred = pred
@@ -539,5 +546,5 @@ class GraphHash_Emb_Code_Binary(GraphHash_Emb_Code):
         self.code_mse_loss = code_mse_loss
         self.emb_mse_loss = emb_mse_loss
 
-        self.loss += FLAGS.binary_regularizer_weight*\
+        self.loss = self.loss+FLAGS.binary_regularizer_weight*\
                     binary_regularizer(self.outputs[0])

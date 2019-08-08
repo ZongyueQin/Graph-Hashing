@@ -15,13 +15,15 @@ import sys
 
 
 from utils import *
-from graphHashFunctions import GraphHash_Emb_Code
+from graphHashFunctions import GraphHash_Emb_Code_Binary
 import numpy as np
 from config import FLAGS
 from DataFetcher import DataFetcher
 import pickle
 
-os.environ['CUDA_VISIBLE_DEVICES']='4,5'
+train = False
+
+os.environ['CUDA_VISIBLE_DEVICES']='4,6'
 test_classification = True
 
 # Set random seed
@@ -70,7 +72,7 @@ placeholders = {
 
 
 # Create model
-model = GraphHash_Emb_Code(placeholders, 
+model = GraphHash_Emb_Code_Binary(placeholders, 
                        input_dim=data_fetcher.get_node_feature_dim(),
                        next_ele = next_element,
                        logging=True)
@@ -81,43 +83,43 @@ sess = tf.Session()
 saver = tf.train.Saver()
 cost_val = []
 
-
-print('start optimization...')
-sess.run(tf.global_variables_initializer())
-train_start = time.time()
-for epoch in range(FLAGS.epochs):
+if train:
+    print('start optimization...')
+    sess.run(tf.global_variables_initializer())
+    train_start = time.time()
+    for epoch in range(FLAGS.epochs):
     
-    t = time.time()
+        t = time.time()
     
     # Construct feed dictionary
-    feed_dict = construct_feed_dict_prefetch(data_fetcher, placeholders)
+        feed_dict = construct_feed_dict_prefetch(data_fetcher, placeholders)
     # Training step
-    outs = sess.run([model.opt_op, model.loss], feed_dict=feed_dict)
+        outs = sess.run([model.opt_op, model.loss], feed_dict=feed_dict)
     
-    if (epoch+1) % 100 == 0:
-        pred,lab = sess.run([model.pred, model.lab], feed_dict=feed_dict)
-        print(pred)
-        print(lab)
+        if (epoch+1) % 50 == 0:
+            pred,lab = sess.run([model.pred, model.lab], feed_dict=feed_dict)
+            print(pred)
+            print(lab)
     
     # No Validation For Now
 
     # Print loss
-    print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(outs[1]), 
+        print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(outs[1]), 
           "time=", "{:.5f}".format(time.time() - t))
 
 #    if epoch > FLAGS.early_stopping and cost_val[-1] > np.mean(cost_val[-(FLAGS.early_stopping+1):-1]):
 #        print("Early stopping...")
 #        break
 
-print("Optimization Finished, tiem cost {:.5f} s"\
+    print("Optimization Finished, tiem cost {:.5f} s"\
       .format(time.time()-train_start))
 
-save_path = saver.save(sess, "SavedModel/model_rank.ckpt")
-print("Model saved in path: {}".format(save_path))
+    save_path = saver.save(sess, "SavedModelBinary/model_rank.ckpt")
+    print("Model saved in path: {}".format(save_path))
 
-"""
-saver.restore(sess, "SavedModel/model_rank.ckpt")
-"""
+else:
+    saver.restore(sess, "SavedModelBinary/model_rank.ckpt")
+    print("Model restored")
 
 
 
@@ -153,7 +155,7 @@ for i in range(0, train_graph_num, encode_batchsize):
     all_embs = all_embs + embs
     
 all_codes_np = np.array(all_codes)
-thres = np.median(all_codes_np, axis=0)
+thres = np.mean(all_codes_np, axis=0)
 id2emb = {}
 for i, pair in enumerate(zip(all_codes, all_embs)):
     code = pair[0]
@@ -165,16 +167,16 @@ for i, pair in enumerate(zip(all_codes, all_embs)):
     inverted_index[tuple_code].append((gid, emb))
     id2emb[gid] = emb
 
-index_file = open('SavedModel/inverted_index_rank.pkl', 'wb')
+index_file = open('SavedModelBinary/inverted_index_rank.pkl', 'wb')
 pickle.dump(inverted_index, index_file)
 index_file.close()
-writeInvertedIndex('SavedModel/inverted_index.txt', inverted_index, FLAGS.embedding_dim)
+writeInvertedIndex('SavedModelBinary/inverted_index.txt', inverted_index, FLAGS.embedding_dim)
 subprocess.check_output(['./processInvertedIndex', 
-                        'SavedModel/inverted_index.txt',
-                        'SavedModel/inverted_index.index', 
-                        'SavedModel/inverted_index.value'])
+                        'SavedModelBinary/inverted_index.txt',
+                        'SavedModelBinary/inverted_index.index', 
+                        'SavedModelBinary/inverted_index.value'])
 
-print('finish encoding, saved index to SavedModel/inverted_index_rank.pkl')
+print('finish encoding, saved index to SavedModelBinary/inverted_index_rank.pkl')
  
 
 # Compute MSE of estimated GED for training data
@@ -305,6 +307,8 @@ zero_cnt = [0 for i in range(t_max)]
 precisions_nz = [[] for i in range(t_max)]
 recalls_nz = [[] for i in range(t_max)]
 f1_scores_nz = [[] for i in range(t_max)]
+
+ret_size = [[] for i in range(t_max)]
 
 
 MSE_test_con = 0
@@ -495,32 +499,37 @@ else:
                     
                     query_time = time.time()
                     if FLAGS.fine_grained:
-                        raise RuntimeError('Cannot use fine tuned in classification task for now')
+                        
                         ret = subprocess.check_output(['./query',
                                                    str(tupleCode2IntegerCode(tuple_code)),
                                                    str(t),
-                                                   'SavedModel/inverted_index.index',
-                                                   'SavedModel/inverted_index.value',
+                                                   'SavedModelBinary/inverted_index.index',
+                                                   'SavedModelBinary/inverted_index.value',
                                                    str(len(inverted_index.keys())),
                                                    str(train_graph_num),
                                                    str(FLAGS.hash_code_len),
                                                    str(FLAGS.embedding_dim),
-                                                   '1'] + [str(dim) for dim in emb])
+                                                   '1',
+                                                   str(FLAGS.GED_threshold)] + [str(dim) for dim in emb])
+                        
+ 
                     else:
                         ret = subprocess.check_output(['./query',
                                                    str(tupleCode2IntegerCode(tuple_code)),
                                                    str(t),
-                                                   'SavedModel/inverted_index.index',
-                                                   'SavedModel/inverted_index.value',
+                                                   'SavedModelBinary/inverted_index.index',
+                                                   'SavedModelBinary/inverted_index.value',
                                                    str(len(inverted_index.keys())),
                                                    str(train_graph_num),
-                                                   str(FALGS.hash_code_len),
+                                                   str(FLAGS.hash_code_len),
                                                    str(FLAGS.embedding_dim),
                                                    '-1'])
                     if i + j == 0:
                         print('t={:d}, cost {:f} s'.format(t, time.time()-query_time))
 
                     similar_set = set([int(gid) for gid in ret.split()])
+
+                    ret_size[t-1].append(len(similar_set))
 
                     while cur_pos < len(ground_truth[q]) and\
                           ground_truth[q][cur_pos][1] <= t:
@@ -568,7 +577,6 @@ else:
 print(test_ged_cnt)
 print(pred_cnt)
 print('MSE for test (continuous) = {:f}'.format(MSE_test_con))
-print('MSE for test (discrete) = {:f}'.format(MSE_test_dis))
 
 if test_classification:
     print('For classification query')
@@ -578,6 +586,7 @@ if test_classification:
         print('average precision = %f'%(sum(precisions[t-1])/len(precisions[t-1])), end = ' ')
         print('average recall = %f'%(sum(recalls[t-1])/len(recalls[t-1])), end = ' ')
         print('average f1-score = %f'%(sum(f1_scores[t-1])/len(f1_scores[t-1])))
+        print('average return size = %f'%(sum(ret_size[t-1])/len(ret_size[t-1])))
 
     print('ignore empty answers')
     for t in range(1,t_max):

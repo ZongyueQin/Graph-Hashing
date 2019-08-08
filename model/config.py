@@ -3,21 +3,23 @@ import tensorflow as tf
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 
-# data sample related
-flags.DEFINE_integer('k', 5, 'when training, we would generate k similar graphs for each one of sampled graphs')
-flags.DEFINE_integer('GED_threshold', 8, 'threshold within which 2 graphs are similar')
+#dataset related
 flags.DEFINE_string('dataset', 'AIDS', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
 flags.DEFINE_string('ground_truth_file', 'GT8.txt', 'ground truth file, should be in test directory')
-flags.DEFINE_integer('batchsize',10,'batch size for training')
 flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
 flags.DEFINE_string('node_feat_name','type','Name of node feature')
 flags.DEFINE_string('node_label_name', 'label', 'Name of node label, none if it\'s idx')
+
+# data sample related
+flags.DEFINE_integer('k', 5, 'when training, we would generate k similar graphs for each one of sampled graphs')
+flags.DEFINE_integer('GED_threshold', 8, 'threshold within which 2 graphs are similar')
+flags.DEFINE_integer('batchsize',10,'batch size for training')
 flags.DEFINE_string('label_type', 'ged', 'whether training label should be binary or ged')
 
 # loss related
 flags.DEFINE_float('weight_decay', 0.00, 'Weight for L2 loss on embedding matrix.')
 flags.DEFINE_float('DSH_loss_m',24,'parameter m for DSH loss')
-flags.DEFINE_float('binary_regularizer_weight',0.5,'weight for binary regularizer')
+flags.DEFINE_float('binary_regularizer_weight',1,'weight for binary regularizer')
 flags.DEFINE_float('MAX_BRW', 2, 'maximal binary regularizer weight')
 flags.DEFINE_float('BRW_increase_rate', 2, 'the rate to incrase binary regularizer weight')
 flags.DEFINE_float('real_data_loss_weight', 1, 'weight of real data part (loss_1) in MSE_loss')
@@ -37,9 +39,9 @@ flags.DEFINE_integer('hidden4', 348, 'Number of units in hidden layer 4.')
 flags.DEFINE_integer('hidden5', 256, 'Number of units in hidden layer 5.')
 flags.DEFINE_integer('embedding_dim', 256, 'dimension of embeddings')
 
-flags.DEFINE_integer('hidden6', 64, 'Number of units in hidden layer 6.')
+flags.DEFINE_integer('hidden6', 256, 'Number of units in hidden layer 6.')
 
-flags.DEFINE_integer('hash_code_len',32,'length of hash code')
+flags.DEFINE_integer('hash_code_len',48,'length of hash code')
 
 # training related
 flags.DEFINE_float('dropout', 0., 'Dropout rate (1 - keep probability).')

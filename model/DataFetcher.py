@@ -356,13 +356,7 @@ class DataFetcher:
         for fname in fnames:
             os.remove(fname)
         
-        if FLAGS.label_type == 'ged':
-            return geds
-        elif FLAGS.label_type == 'binary':
-            labels = geds < FLAGS.GED_threshold
-            return labels.astype(float)
-        else:
-            raise RuntimeError('Unrecognized label type: {:s}'.format(FLAGS.label_type))
+        return geds
 
     def getLabelForPair(self, g1, g2):
         
@@ -390,17 +384,12 @@ class DataFetcher:
         ged = self.getLabelForPair(self.sample_graphs[id1], 
                                    self.sample_graphs[id2])
         
-        if FLAGS.label_type == 'binary':
-            if ged > -1:
-                self.labels[id1, id2] = 1
-                self.labels[id2, id1] = 1
+        if ged > -1:
+            self.labels[id1, id2] = ged
+            self.labels[id2, id1] = ged
         else:
-            if ged > -1:
-                self.labels[id1, id2] = ged
-                self.labels[id2, id1] = ged
-            else:
-                self.labels[id1, id2] = FLAGS.GED_threshold
-                self.labels[id2, id1] = FLAGS.GED_threshold
+            self.labels[id1, id2] = FLAGS.GED_threshold
+            self.labels[id2, id1] = FLAGS.GED_threshold
         return
 
     def writeGraph2TempFile(self, graph):
@@ -446,12 +435,7 @@ class DataFetcher:
             # sample how many edit operation to perform
             op_num = randint(1,FLAGS.GED_threshold-2)
             # though not accurate, may be good enough
-            if FLAGS.label_type == 'ged':
-                geds.append(op_num)
-            elif FLAGS.label_type == 'binary':
-                geds.append(1)
-            else:
-                raise RuntimeError('Unrecognized label type: {:s}'.format(FLAGS.label_type))
+            geds.append(op_num)
             j = 0
             op_cannot_be_1 = False
             op_cannot_be_2 = False

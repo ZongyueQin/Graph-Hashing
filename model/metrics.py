@@ -27,13 +27,21 @@ def binary_regularizer(codes):
 #    distance_to_1 = tf.abs(tf.abs(codes)-1)
 #    l1_norm = tf.reduce_sum(distance_to_1, axis=1)
 #    return tf.reduce_mean(l1_norm)
-    closer2one = tf.sign(tf.nn.relu(codes-0.5))
-    loss_1 = tf.reduce_sum(closer2one * tf.abs(codes-1), axis=1)
-    loss_2 = tf.reduce_sum((1-closer2one)*tf.abs(codes), axis=1)
-    loss = loss_1 + loss_2
-    return tf.reduce_mean(loss)
 
-def DSH_loss(codes, label_1, label_2, m = FLAGS.hash_code_len/2):
+#    closer2one = tf.sign(tf.nn.relu(codes-0.5))
+#    loss_1 = tf.reduce_sum(closer2one * tf.abs(codes-1), axis=1)
+#    loss_2 = tf.reduce_sum((1-closer2one)*tf.abs(codes), axis=1)
+#    loss = loss_1 + loss_2
+
+    """ make code close to +- 0.5 """
+    
+    loss_mat = tf.abs(codes**2-0.25)
+    #loss = tf.reduce_sum(loss_mat, axis=1)
+    return tf.reduce_mean(loss_mat)
+
+def DSH_Loss(codes, label, m = FLAGS.hash_code_len/2):
+    binary_label = label < FLAGS.GED_threshold
+    binary_label = tf.cast(binary_label, tf.float32)
     """ make similar graphs close, dissimilar graphs distant """
     bs = FLAGS.batchsize
     k = FLAGS.k
@@ -50,8 +58,8 @@ def DSH_loss(codes, label_1, label_2, m = FLAGS.hash_code_len/2):
     pred_1 = (M2 + tf.transpose(M2) - 2*M1)
 #    pred_1 = tf.clip_by_value(pred_1, 0, FLAGS.GED_threshold)
     #loss_mat_1 = tf.matrix_band_part((pred_1 - label_1)**2, 0, -1)
-    loss_mat_1 = label_1 * pred_1 + (1 - label_1) * tf.nn.relu(m-pred_1)
-    loss_mat_1 = tf.matrix_band_part(loss_mat_1, 0, -1)
+    loss_mat_1 = binary_label * pred_1 + (1 - binary_label) * tf.nn.relu(m-pred_1)
+#    loss_mat_1 = tf.matrix_band_part(loss_mat_1, 0, -1)
     #loss_1 = tf.reduce_sum(loss_mat_1)
     loss_1 = tf.reduce_mean(loss_mat_1)
     
@@ -70,7 +78,7 @@ def DSH_loss(codes, label_1, label_2, m = FLAGS.hash_code_len/2):
         loss_2 = tf.reduce_mean(loss_mat_2)
         
     return FLAGS.real_data_loss_weight * loss_1 +\
-           FLAGS.syn_data_loss_weight * loss_2, pred_1, label_1
+           FLAGS.syn_data_loss_weight * loss_2, pred_1, loss_mat_1
 
 def MSE_Loss(codes, label_1, label_2):
     bs = FLAGS.batchsize

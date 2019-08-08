@@ -102,7 +102,7 @@ int main(int argc, char **argv)
 	// ./query code thres file1 file2 totalCodeCnt totalGraphCnt codeLen embLen fine-grained embedding
 	if (argc <= 9)
 	{
-		fprintf(stdout, "command format:./query code thres file1 file2 totalCodeCnt totalGraphCnt embLen fine-grained [embedding]\n");
+		fprintf(stdout, "command format:./query code search_thres file1 file2 totalCodeCnt totalGraphCnt codeLen embLen fine-grained fine_grained_thres [embedding]\n");
 		return -1;
 	}
 	uint64_t queryCode = atoi(argv[1]);
@@ -141,11 +141,13 @@ int main(int argc, char **argv)
 	int embLen = atoi(argv[8]); 
 	GInfo qInfo;
 	int fine_grained = atoi(argv[9]);
+        int fine_grained_thres = 0;
 	if (fine_grained > 0)
 	{
+                fine_grained_thres = atoi(argv[10]);
 		for(int i = 0; i < embLen; i++)
 		{
-			qInfo.emb[i] = atof(argv[i+10]);
+			qInfo.emb[i] = atof(argv[i+11]);
 		}
 	}
 
@@ -158,7 +160,7 @@ int main(int argc, char **argv)
 		int end = code2Pos[validCode[i]+1].pos;
 		for(int j = start; j < end; j++)
 		{
-			if (fine_grained > 0 && dist(qInfo, invertedIndexValue[j], embLen) > (double)thres)
+			if (fine_grained > 0 && dist(qInfo, invertedIndexValue[j], embLen) > (double)fine_grained_thres)
 			{
 				continue;
 			}
