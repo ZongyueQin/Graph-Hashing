@@ -7,7 +7,7 @@ from config import FLAGS
 
 class GraphHash_Naive(Model):
     def __init__(self, placeholders, input_dim, **kwargs):
-        super(Model, self).__init__(**kwargs)
+        super(GraphHash_Naive, self).__init__(**kwargs)
 
         self.graph_embs = []
         self.inputs = [placeholders['features'], placeholders['support'],
@@ -168,7 +168,7 @@ class GraphHash_Naive(Model):
 
 class GraphHash_Rank(GraphHash_Naive):
     def __init__(self, placeholders, input_dim, next_ele, **kwargs):
-        super(GraphHash_Rank, self).__init__(**kwargs)
+        super(GraphHash_Naive, self).__init__(**kwargs)
 
         self.graph_embs = []
         self.inputs = [next_ele[0], next_ele[1], next_ele[2]]
@@ -232,7 +232,7 @@ class GraphHash_Rank(GraphHash_Naive):
                               self.labels, 
                               self.gen_labels)
 
-        self.loss = self.loss + l1_loss(self.outputs[0])
+        #self.loss = self.loss + l1_loss(self.outputs[0])
 
         self.loss = self.loss + mse_loss
         self.mse_loss = mse_loss
@@ -241,7 +241,7 @@ class GraphHash_Rank(GraphHash_Naive):
 
 class GraphHash_Rank_Reg(GraphHash_Rank):
     def __init__(self, placeholders, input_dim, next_ele, **kwargs):
-        super(Model, self).__init__(**kwargs)
+        super(GraphHash_Naive, self).__init__(**kwargs)
 
         self.graph_embs = []
         self.inputs = [next_ele[0], next_ele[1], next_ele[2]]
@@ -505,7 +505,8 @@ class GraphHash_Emb_Code(Model):
                                             self.labels, 
                                             self.gen_labels)
 
-        self.loss = self.loss + code_mse_loss + emb_mse_loss
+        self.loss = self.loss + code_mse_loss * FLAGS.code_mse_w
+        self.loss = self.loss + emb_mse_loss * FLAGS.emb_mse_w
         self.pred = pred
         self.lab = lab
         self.code_mse_loss = code_mse_loss

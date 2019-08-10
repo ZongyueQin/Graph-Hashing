@@ -15,13 +15,13 @@ import sys
 
 
 from utils import *
-from graphHashFunctions import GraphHash_Rank_Reg
+from graphHashFunctions import GraphHash_Rank
 import numpy as np
 from config import FLAGS
 from DataFetcher import DataFetcher
 import pickle
 
-os.environ['CUDA_VISIBLE_DEVICES']='1,4'
+os.environ['CUDA_VISIBLE_DEVICES']='3,4'
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -41,7 +41,7 @@ train = True
 
 
 # Load data
-data_fetcher = DataFetcher(FLAGS.dataset)
+data_fetcher = DataFetcher(FLAGS.dataset, True)
 dataset = tf.data.Dataset.from_generator(data_fetcher.get_train_data, 
                                          (tf.int64, tf.float32, tf.int64,
                                           tf.int64, tf.float32, tf.int64,
@@ -77,7 +77,7 @@ placeholders = {
 
 
 # Create model
-model = GraphHash_Rank_Reg(placeholders, 
+model = GraphHash_Rank(placeholders, 
                        input_dim=data_fetcher.get_node_feature_dim(),
                        next_ele = next_element,
                        logging=True)
@@ -149,7 +149,7 @@ for i in range(0, train_graph_num, encode_batchsize):
                                                idx_list,
                                                'train')
     codes, embs = sess.run([model.encode_outputs[0],
-                            model.ecd_embeddings[0]], 
+                            model.encode_outputs[0]], 
                             feed_dict = feed_dict)
     codes = list(codes)
     codes = codes[0:end-i]
@@ -174,7 +174,7 @@ for i, pair in enumerate(zip(all_codes, all_embs)):
     id2emb[gid] = emb
 
 index_file = open('SavedModel/id2emb.pkl', 'wb')
-pickle.dump(id2_emb, index_file)
+pickle.dump(id2emb, index_file)
 index_file.close()
 
 print('finish encoding, saved index to SavedModel/id2emb.pkl')
@@ -238,7 +238,7 @@ for i in range(100):
                                                idx_list,
                                                'train')
     feed_dict.update({placeholders['thres']: thres})
-    codes, embs, inputs, act = sess.run([model.codes, model.ecd_embeddings[0], model.ecd_inputs, model.ecd_activations], 
+    codes, embs, inputs, act = sess.run([model.codes, model.encode_outputs[0], model.ecd_inputs, model.ecd_activations], 
                           feed_dict = feed_dict)
     emb1 = np.array(embs[0])
     emb2 = np.array(embs[1])
@@ -351,7 +351,7 @@ if not has_GT:
                                                    'test')
         feed_dict.update({placeholders['thres']: thres})
     
-        codes, embs = sess.run([model.codes, model.ecd_embeddings[0]], 
+        codes, embs = sess.run([model.codes, model.encode_outputs[0]], 
                                feed_dict = feed_dict)
         emb1 = np.array(embs[0])
         code1 = codes[0]
@@ -368,7 +368,7 @@ if not has_GT:
                                                    'train')
         feed_dict.update({placeholders['thres']: thres})
 
-        codes, embs = sess.run([model.codes, model.ecd_embeddings[0]], 
+        codes, embs = sess.run([model.codes, model.encode_outputs[0]], 
                                feed_dict = feed_dict)
         emb2 = np.array(embs[0])
         code2 = codes[0]
@@ -410,7 +410,7 @@ else:
                                                   'test')
         feed_dict.update({placeholders['thres']: thres})
         
-        codes, embs = sess.run([model.codes, model.ecd_embeddings[0]], 
+        codes, embs = sess.run([model.codes, model.encode_outputs[0]], 
                                    feed_dict = feed_dict)
         
     

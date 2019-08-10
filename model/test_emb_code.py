@@ -21,7 +21,7 @@ from config import FLAGS
 from DataFetcher import DataFetcher
 import pickle
 
-os.environ['CUDA_VISIBLE_DEVICES']='1,4'
+os.environ['CUDA_VISIBLE_DEVICES']='0,4'
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -34,14 +34,14 @@ seed = 123
 np.random.seed(seed)
 tf.set_random_seed(seed)
 
-train = True
+train = False
 
 #chkp.print_tensors_in_checkpoint_file("SavedModel/model_rank.ckpt", tensor_name='', all_tensors=True, all_tensor_names=True)
 
 
 
 # Load data
-data_fetcher = DataFetcher(FLAGS.dataset)
+data_fetcher = DataFetcher(FLAGS.dataset, True)
 dataset = tf.data.Dataset.from_generator(data_fetcher.get_train_data, 
                                          (tf.int64, tf.float32, tf.int64,
                                           tf.int64, tf.float32, tf.int64,
@@ -160,8 +160,11 @@ for i in range(0, train_graph_num, encode_batchsize):
     all_embs = all_embs + embs
     
 all_codes_np = np.array(all_codes)
-#thres = np.mean(all_codes_np, axis=0)
+#thres = np.median(all_codes_np, axis=0)
+
 thres = np.zeros(FLAGS.hash_code_len)
+print('threshold is')
+print(thres)
 id2emb = {}
 for i, pair in enumerate(zip(all_codes, all_embs)):
     code = pair[0]
@@ -570,7 +573,7 @@ else:
                     if FLAGS.fine_grained:
                         ret = subprocess.check_output(['./query',
                                                    str(tupleCode2IntegerCode(tuple_code)),
-                                                   str(t),
+                                                   str(t + 1),
                                                    'SavedModel/inverted_index.index',
                                                    'SavedModel/inverted_index.value',
                                                    str(len(inverted_index.keys())),
