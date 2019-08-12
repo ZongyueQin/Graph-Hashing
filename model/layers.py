@@ -5,6 +5,10 @@ from inits import glorot, zeros
 # global unique layer ID dictionary for layer name assignment
 _LAYER_UIDS = {}
 
+def mul_3D2D(tensor, mat, interact_dim, output_dim_1, output_dim_2):
+    mid_res = tf.reshape(tensor, [-1, interact_dim])
+    mid_res = tf.matmul(mid_res, mat)
+    return tf.reshape(mid_res, [-1, output_dim_1, output_dim_2])
 
 def get_layer_uid(layer_name=''):
     """Helper function, assigns unique layer IDs."""
@@ -301,3 +305,101 @@ class SplitAndAttentionPooling(Layer):
             output = tf.stack(graph_emb_list,axis=0)
 
         return [output, inputs[1], inputs[2]]
+
+class SplitIntoPairs(Layer):
+    def __init__(self, **kwargs):
+        super(SplitIntoPairs, self).__init__(**kwargs)
+            
+    def _call(self, inputs):
+        x = inputs[0]
+        bs = FLAGS.batchsize
+        k = FLAGS.k
+        
+        x1, x2 = tf.split(x, [bs, bs*k])
+        x2 = tf.reshape(x2, [bs, k, -1])
+        tmp = tf.reshape(x1, [bs, 1, -1])
+        tmp = tf.tile(tmp, [1, bs, 1])
+        x2 = tf.concat([tmp, x2], axis=1)
+        
+        x = [x1, x2]
+        return [x, inputs[1], inputs[2]]
+    
+class NTN(Layer):
+    def __init__(self, input_dim, output_dim, placeholders, dropout=0.,
+                 act=tf.nn.relu, bias=False,
+                 **kwargs):
+        super(NTN, self).__init__(**kwargs)
+
+        if dropout:
+            self.dropout = placeholders['dropout']
+        else:
+            self.dropout = 0.
+
+        self.act = act
+        self.support = placeholders['support']
+        self.bias = bias
+
+        # helper variable for sparse dropout
+        #self.num_features_nonzero = placeholders['num_features_nonzero']
+        
+        with tf.variable_scope(self.name + '_vars'):
+            
+            self.vars['W'] = glorot([output_dim, input_dim, input_dim],
+                                                        name='W')
+            self.vars['V'] = glorot([output_dim, 2*input_dim, 1],
+                                     name='V')
+            if self.bias:
+                self.vars['bias'] = zeros([output_dim], name='bias')
+
+        if self.logging:
+            self._log_vars()
+
+    def _call(self, inputs):
+        x1 = inputs[0][0]
+        x2 = inputs[0][1]
+        x2_t = tf.transpose(x2, perm=[0,2,1])
+        # convolve
+        with tf.variable_scope(self.name + '_vars'):
+            if self.dropout:
+            # dropout
+                W = tf.nn.dropout(self.vars['W'], 
+                                    1 - self.dropout)
+                V = tf.nn.dropout(self.vars['V'],
+                                  1 - self.dropout)
+                if self.bias:
+                    bias = tf.nn.dropout(self.vars['bias'], 
+                                     1 - self.dropout)
+
+            else:
+                W = self.vars['W']
+                V = self.vars['V']
+                if self.bias:
+                    bias = self.vars['bias']
+
+            output_list = []
+            bs = FLAGS.batchsize
+            k = FLAGS.k
+            for i in range(self.output_dim):
+                mid_res_1 = tf.matmul(x1, W[i])
+                mid_res_1 = tf.reshape(mid_res_1, [bs, 1, self.input_dim])
+                mid_res_1 = tf.matmul(mid_res_1, x2_t)
+                mid_res_1 = tf.squeeze(mid_res_1)
+                
+                mid_res_2 = tf.reshape(x1, [bs, 1, self.input_dim])
+                mid_res_2 = tf.tile(mid_res_2, [1, bs+k, 1])
+                mid_res_2 = tf.concat([mid_res_2, x2], axis=2)
+                mid_res_2 = mul_3D2D(mid_res_2, V[i], 
+                                     2*self.input_dim,
+                                     k+bs, 1)
+                mid_res_2 = tf.squeeze(mid_res_2)
+                
+                mid_res = mid_res_1+mid_res_2
+                if self.bias:
+                    mid_res = mid_res + bias[i]
+                mid_res = tf.reshape(mid_res, [bs*(k+bs),1])
+                output_list.append(mid_res)
+                
+            output = tf.concat(output_list, axis=1)
+
+
+        return [self.act(output),inputs[1], inputs[2]]

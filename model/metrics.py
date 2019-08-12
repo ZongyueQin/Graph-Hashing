@@ -80,6 +80,27 @@ def DSH_Loss(codes, label, m = FLAGS.hash_code_len/2):
     return FLAGS.real_data_loss_weight * loss_1 +\
            FLAGS.syn_data_loss_weight * loss_2, pred_1, loss_mat_1
 
+def MSE_Loss_SimGNN(preds, label_1, label_2):
+    bs = FLAGS.batchsize
+    k = FLAGS.k
+
+    label = tf.reshape(tf.concat([label_1, label_2], axis=1), 
+                       [bs*(bs+k)])
+    preds = tf.squeeze(preds)
+    preds = tf.clip_by_value(preds, 0, FLAGS.GED_threshold)
+    loss_vec = (preds-label)**2
+    
+    w_mask_1 = FLAGS.real_data_loss_weight * tf.ones([bs, bs], tf.float32)
+    w_mask_2 = FLAGS.syn_data_loss_weight * tf.ones([bs, k], tf.float32)
+    w_mask = tf.reshape(tf.concat([w_mask_1, w_mask_2], axis=1),
+                        [bs*(bs+k)])
+    
+    loss = tf.reduce_mean(loss_vec*w_mask)
+    
+    return loss
+    
+    
+
 def MSE_Loss(codes, label_1, label_2):
     bs = FLAGS.batchsize
     k = FLAGS.k
