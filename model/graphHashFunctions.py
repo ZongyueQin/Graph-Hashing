@@ -179,7 +179,7 @@ class GraphHash_Rank(GraphHash_Naive):
             
         self.input_dim = input_dim
         # self.input_dim = self.inputs.get_shape().as_list()[1]  # To be supported in future Tensorflow versions
-        self.output_dim = FLAGS.hash_code_len
+        self.output_dim = FLAGS.embedding_dim
         self.placeholders = placeholders
 
         self.optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate)

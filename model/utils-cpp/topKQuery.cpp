@@ -14,7 +14,7 @@
 #include <string.h>
 #include <queue>
 #include <queue>
-
+#include <iostream>
 
 using namespace std;
 
@@ -76,7 +76,7 @@ int BinarySearch(CodePos *array, int len, uint64_t code)
 	return -1;
 }
 
-void getTopKByEmb(int K, int graphCnt, GInfo *gInfo, vector<int> gid)
+void getTopKByEmb(int K, int graphCnt, GInfo *gInfo, deque<uint64_t>& gid)
 {
 	priority_queue<GInfo, vector<GInfo>, Comp> heap;
 	for(int i = 0; i < graphCnt; i++)
@@ -87,12 +87,12 @@ void getTopKByEmb(int K, int graphCnt, GInfo *gInfo, vector<int> gid)
 	}	
 	while (!heap.empty())
 	{
-		gid.push_back(heap.top().gid);
+		gid.push_front(heap.top().gid);
 		heap.pop();
 	}
 }
 
-int getTopKByCode(int K, uint64_t code, int codeLen, int thres, int totalCodeCnt, int embLen, 
+int getTopKByCode(int K, uint64_t code, int codeLen, int thres, int totalCodeCnt, 
             int totalGraphCnt, CodePos *index, vector<uint64_t> &res)
 {
 	queue <SearchNode> que;
@@ -100,13 +100,15 @@ int getTopKByCode(int K, uint64_t code, int codeLen, int thres, int totalCodeCnt
         int curHDist = 0;
         uint64_t num2Search = 1;
 	int candNum = 0;
-	while (!que.empty() && candNum < K)
+        int cnt = 0;
+	while ((!que.empty()) && candNum < 5*K)
 	{
 		SearchNode curNode = que.front();
+
 		que.pop();
-        	
 		if (curNode.dist > curHDist)
 		{
+			cnt = 0;
 			num2Search *= (codeLen-curHDist);
 			curHDist = curNode.dist;
 			num2Search /= curHDist;
@@ -136,7 +138,7 @@ int getTopKByCode(int K, uint64_t code, int codeLen, int thres, int totalCodeCnt
 #endif
 		{
 			int pow = curNode.last_flip_pos + 1;
-			for(; pow < embLen; pow++)
+			for(; pow < codeLen; pow++)
 			{
 				uint64_t mask = (1 << pow);
 				uint64_t newCode = curNode.code ^ mask;
@@ -195,14 +197,15 @@ int main(int argc, char **argv)
 	for(int i = 0; i < embLen; i++)
 	{
 		qInfo.emb[i] = atof(argv[i+10]);
+//		qInfo.emb[i] = 0;
 	}
 
 	Comp::embLen = embLen;
 	Comp::qInfo = qInfo;
 
 	vector <uint64_t> validCode;
-	vector<int> gids;
-	int ret = getTopKByCode(K, queryCode, codeLen, thres, totalCodeCnt, embLen, totalGraphCnt, code2Pos, validCode);
+	deque <uint64_t> gids;
+	int ret = getTopKByCode(K, queryCode, codeLen, thres, totalCodeCnt, totalGraphCnt, code2Pos, validCode);
 	if (ret > 0)
 	{
 		GInfo *candidates = new GInfo[ret];

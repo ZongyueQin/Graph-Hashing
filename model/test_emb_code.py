@@ -21,12 +21,12 @@ from config import FLAGS
 from DataFetcher import DataFetcher
 import pickle
 
-os.environ['CUDA_VISIBLE_DEVICES']='0,4'
+os.environ['CUDA_VISIBLE_DEVICES']='4,5'
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
-test_top_k = False
+test_top_k = True
 test_range_query = True
 
 # Set random seed
@@ -34,7 +34,7 @@ seed = 123
 np.random.seed(seed)
 tf.set_random_seed(seed)
 
-train = False
+train = True
 
 #chkp.print_tensors_in_checkpoint_file("SavedModel/model_rank.ckpt", tensor_name='', all_tensors=True, all_tensor_names=True)
 
@@ -283,7 +283,7 @@ print('MSE for training (discrete) = {:f}'.format(MSE_train_dis))
 print('Start testing')
 
 total_query_num = data_fetcher.get_test_graphs_num()
-
+#total_query_num = 2
 # Read Ground Truth
 ground_truth = {}
 ground_truth_path = os.path.join('..','data',
@@ -330,6 +330,8 @@ f1_scores_nz = [[] for i in range(t_max)]
 
 ret_size = [[] for i in range(t_max)]
 
+top_k_query_time = []
+range_query_time = [[] for i in range(t_max)]
 
 MSE_test_con = 0
 MSE_test_dis = 0
@@ -423,6 +425,7 @@ else:
         
     
         for j, tup in enumerate(zip(codes, embs)):
+            print(i+j)
             code = tup[0]
             emb = tup[1]
             # ignore all padding graphs
@@ -536,11 +539,28 @@ else:
 
             if test_top_k:
                 # top k query
-                est_top_k_wrp = get_top_k_similar_graphs_gid(inverted_index, 
-                                                             tuple_code,
-                                                             emb,
-                                                             FLAGS.top_k)
-            
+            #    est_top_k_wrp = get_top_k_similar_graphs_gid(inverted_index, 
+            #                                                 tuple_code,
+            #                                                 emb,
+            #                                                 FLAGS.top_k)
+                query_time = time.time()
+                ret = subprocess.check_output(['./topKQuery',
+                                               str(tupleCode2IntegerCode(tuple_code)),
+                                               str(FLAGS.hash_code_len),
+                                               'SavedModel/inverted_index.index',
+                                               'SavedModel/inverted_index.value',
+                                               str(len(inverted_index.keys())),
+                                               str(train_graph_num),
+                                               str(FLAGS.hash_code_len),
+                                               str(FLAGS.embedding_dim),
+                                               str(FLAGS.top_k)] + [str(dim) for dim in emb])
+             
+                top_k_query_time.append(time.time()-query_time)
+                if i + j == 0:
+                    print('top {:d}, cost {:f} s'.format(FLAGS.top_k, time.time()-query_time))
+                   # print(ret)
+                est_top_k = [int(gid) for gid in ret.split()]
+
 
                 pos = FLAGS.top_k
                 while ground_truth[q][pos][1] == ground_truth[q][pos-1][1]:
@@ -550,22 +570,45 @@ else:
 
                 true_top_k_wrp = ground_truth[q][0:pos]
         
-                est_top_k = [pair[0] for pair in est_top_k_wrp]
                 true_top_k = [pair[0] for pair in true_top_k_wrp]
 #               print(true_top_k)
 #               print(est_top_k)
 
                 PAtKs.append(len(set(est_top_k)&set(true_top_k)) / FLAGS.top_k)
-                true_top_k = true_top_k[0:FLAGS.top_k]
-                rho, _ = spearmanr(est_top_k, true_top_k)
+   
+                # compute real rank
+                real_rank_all = {}
+                last_d = -1
+                last_rank = 1
+                for pos, pair in enumerate(ground_truth[q]):
+                    gid = pair[0]
+                    d = pair[1]
+                    if d == last_d:
+                        real_rank_all[gid] = last_rank
+                    else:
+                        real_rank_all[gid] = pos + 1
+                        last_rank = pos + 1
+                        last_d = d
+
+                real_rank = [real_rank_all[gid] for gid in est_top_k]
+                tie_handler = {}
+                for pos, rk in enumerate(real_rank):
+                    if rk in tie_handler.keys():
+                        real_rank[pos] = tie_handler[rk]
+                        tie_handler[rk] = tie_handler[rk]+1
+                    else:
+                        tie_handler[rk] = rk + 1
+                
+                rho, _ = spearmanr(list(range(1,FLAGS.top_k+1)), real_rank)
                 SRCCs.append(rho)
-                tau, _ = kendalltau(est_top_k, true_top_k)
+                tau, _ = kendalltau(list(range(1, FLAGS.top_k+1)), real_rank)
                 KRCCs.append(tau)
 
 
         
             # range query
             if test_range_query:
+                #print('range')
                 cur_pos = 0
                 for t in range(1,t_max):
                     
@@ -593,8 +636,11 @@ else:
                                                    str(FLAGS.hash_code_len),
                                                    str(FLAGS.embedding_dim),
                                                    '-1'])
+                    range_query_time[t-1].append(time.time()-query_time)
                     if i + j == 0:
                         print('t={:d}, cost {:f} s'.format(t, time.time()-query_time))
+                        #if t <= 3:
+                        #    print(ret)
 
                     similar_set = set([int(gid) for gid in ret.split()])
 
@@ -655,6 +701,7 @@ if test_top_k:
     print('average precision at k = {:f}'.format(sum(PAtKs)/len(PAtKs)))
     print('average rho = {:f}'.format(sum(SRCCs)/len(SRCCs)))
     print('average tau = {:f}'.format(sum(KRCCs)/len(KRCCs)))
+    print('average search time = {:f}'.format(sum(top_k_query_time)/len(top_k_query_time)))
 
 if test_range_query:
     print('For range query')
@@ -664,14 +711,29 @@ if test_range_query:
         print('average precision = %f'%(sum(precisions[t-1])/len(precisions[t-1])), end = ' ')
         print('average recall = %f'%(sum(recalls[t-1])/len(recalls[t-1])), end = ' ')
         print('average f1-score = %f'%(sum(f1_scores[t-1])/len(f1_scores[t-1])), end = ' ')
-        print('average return size = %f'%(sum(ret_size[t-1])/len(ret_size[t-1])))
+        print('average return size = %f'%(sum(ret_size[t-1])/len(ret_size[t-1])), end = ' ')
+        print('average search time = {:f}'.format(sum(range_query_time[t-1])/len(range_query_time[t-1])))
 
     print('ignore empty answers')
     for t in range(1,t_max):
         print('threshold = {:d}'.format(t), end = ' ')
-        print('average precision = %f'%(sum(precisions_nz[t-1])/len(precisions_nz[t-1])), end = ' ')
-        print('average recall = %f'%(sum(recalls_nz[t-1])/len(recalls_nz[t-1])), end = ' ')
-        print('average f1-score = %f'%(sum(f1_scores_nz[t-1])/len(f1_scores_nz[t-1])))
+        if len(precisions_nz[t-1]) > 0:
+            ave_pre_nz = sum(precisions_nz[t-1])/len(precisions_nz[t-1])
+        else:
+            ave_pre_nz = float('nan')
+        print('average precision = %f'%(ave_pre_nz), end = ' ')
+ 
+        if len(recalls_nz[t-1]) > 0:
+            ave_rc_nz = sum(recalls_nz[t-1])/len(recalls_nz[t-1])
+        else:
+            ave_rc_nz = float('nan') 
+        print('average recall = %f'%(ave_rc_nz), end = ' ')
+
+        if len(f1_scores_nz[t-1]) > 0:
+            ave_f1_nz = sum(f1_scores_nz[t-1])/len(f1_scores_nz[t-1])
+        else:
+            ave_f1_nz = float('nan')
+        print('average f1-score = %f'%(ave_f1_nz))
 
     print(ged_cnt)
     print('FLAGS.k={:d}'.format(FLAGS.k))

@@ -63,7 +63,7 @@ int BinarySearch(CodePos *array, int len, uint64_t code)
 }
 
 // return is in res, the index (position) in Code2Pos
-void getAllValidCode(uint64_t code, int thres, int totalCodeCnt, int embLen, CodePos *index, vector<uint64_t> &res)
+void getAllValidCode(uint64_t code, int thres, int totalCodeCnt, int codeLen, CodePos *index, vector<uint64_t> &res)
 {
 	queue <SearchNode> que;
 	que.push(SearchNode(code, 0, -1));
@@ -85,7 +85,7 @@ void getAllValidCode(uint64_t code, int thres, int totalCodeCnt, int embLen, Cod
 #endif
 		{
 			int pow = curNode.last_flip_pos + 1;
-			for(; pow < embLen; pow++)
+			for(; pow < codeLen; pow++)
 			{
 				uint64_t mask = (1 << pow);
 				uint64_t newCode = curNode.code ^ mask;

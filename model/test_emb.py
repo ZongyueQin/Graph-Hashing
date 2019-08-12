@@ -2,6 +2,7 @@
 
 from __future__ import division
 from __future__ import print_function
+from queue import PriorityQueue as PQ
 
 import time
 import tensorflow as tf
@@ -26,7 +27,7 @@ os.environ['CUDA_VISIBLE_DEVICES']='3,4'
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
-test_top_k = False
+test_top_k = True
 test_range_query = True
 
 # Set random seed
@@ -71,7 +72,7 @@ placeholders = {
 #    'num_features_nonzero': tf.placeholder(tf.int32),  # helper variable for sparse dropout
     'graph_sizes': tf.placeholder(tf.int32, shape=((1+FLAGS.k)*FLAGS.batchsize)),
     'generated_labels':tf.placeholder(tf.float32, shape=(FLAGS.batchsize, FLAGS.k)),
-    'thres':tf.placeholder(tf.float32, shape=(FLAGS.hash_code_len))
+    'thres':tf.placeholder(tf.float32, shape=(FLAGS.embedding_dim))
 }
 
 
@@ -161,7 +162,7 @@ for i in range(0, train_graph_num, encode_batchsize):
     
 all_codes_np = np.array(all_codes)
 #thres = np.mean(all_codes_np, axis=0)
-thres = np.zeros(FLAGS.hash_code_len)
+thres = np.zeros(FLAGS.embedding_dim)
 id2emb = {}
 for i, pair in enumerate(zip(all_codes, all_embs)):
     code = pair[0]
@@ -450,8 +451,67 @@ else:
 
             if test_top_k:
                 # top k query
-               
-                raise NotImplementedError
+                est_top_k_wrp = PQ(maxsize=FLAGS.top_k)
+
+                for gid in id2emb.keys():
+                    emb1 = np.array(emb)
+                    emb2 = np.array(id2emb[gid])
+                    est_ged = np.sum((emb1-emb2)**2)
+                    item = (-est_ged, gid)
+                    if est_top_k_wrp.full():
+                        maxItem = est_top_k_wrp.get()
+                        if maxItem[0] > item[0]:
+                            item = maxItem
+                    est_top_k_wrp.put(item, block=False)
+
+                est_top_k = [0 for idx in range(FLAGS.top_k)]
+                for idx in range(FLAGS.top_k):
+                    item = est_top_k_wrp.get()
+                    est_top_k[FLAGS.top_k-1-idx] = item[1]
+                
+
+                pos = FLAGS.top_k
+                while ground_truth[q][pos][1] == ground_truth[q][pos-1][1]:
+                    pos = pos + 1
+                    if pos == len(ground_truth[q]):
+                        break
+
+                true_top_k_wrp = ground_truth[q][0:pos]
+        
+                true_top_k = [pair[0] for pair in true_top_k_wrp]
+#               print(true_top_k)
+#               print(est_top_k)
+
+                PAtKs.append(len(set(est_top_k)&set(true_top_k)) / FLAGS.top_k)
+   
+                # compute real rank
+                real_rank_all = {}
+                last_d = -1
+                last_rank = 1
+                for pos, pair in enumerate(ground_truth[q]):
+                    gid = pair[0]
+                    d = pair[1]
+                    if d == last_d:
+                        real_rank_all[gid] = last_rank
+                    else:
+                        real_rank_all[gid] = pos + 1
+                        last_rank = pos + 1
+                        last_d = d
+
+                real_rank = [real_rank_all[gid] for gid in est_top_k]
+                tie_handler = {}
+                for pos, rk in enumerate(real_rank):
+                    if rk in tie_handler.keys():
+                        real_rank[pos] = tie_handler[rk]
+                        tie_handler[rk] = tie_handler[rk]+1
+                    else:
+                        tie_handler[rk] = rk + 1
+                
+                rho, _ = spearmanr(list(range(1,FLAGS.top_k+1)), real_rank)
+                SRCCs.append(rho)
+                tau, _ = kendalltau(list(range(1, FLAGS.top_k+1)), real_rank)
+                KRCCs.append(tau)
+
 
         
             # range query
