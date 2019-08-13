@@ -5,10 +5,14 @@ from inits import glorot, zeros
 # global unique layer ID dictionary for layer name assignment
 _LAYER_UIDS = {}
 
-def mul_3D2D(tensor, mat, interact_dim, output_dim_1, output_dim_2):
+def mul_3D2D(tensor, mat, interact_dim):
+    ten_shape = tf.shape(tensor)
+    mat_shape = tf.shape(mat)
+    ret_shape = tf.concat([ten_shape[0:2], mat_shape[1:]], axis=0)
+
     mid_res = tf.reshape(tensor, [-1, interact_dim])
     mid_res = tf.matmul(mid_res, mat)
-    return tf.reshape(mid_res, [-1, output_dim_1, output_dim_2])
+    return tf.reshape(mid_res, ret_shape)
 
 def get_layer_uid(layer_name=''):
     """Helper function, assigns unique layer IDs."""
@@ -316,6 +320,8 @@ class SplitIntoPairs(Layer):
         k = FLAGS.k
         
         x1, x2 = tf.split(x, [bs, bs*k])
+        print(bs)
+        print(k)
         x2 = tf.reshape(x2, [bs, k, -1])
         tmp = tf.reshape(x1, [bs, 1, -1])
         tmp = tf.tile(tmp, [1, bs, 1])
@@ -338,6 +344,8 @@ class NTN(Layer):
         self.act = act
         self.support = placeholders['support']
         self.bias = bias
+        self.input_dim = input_dim
+        self.output_dim = output_dim
 
         # helper variable for sparse dropout
         #self.num_features_nonzero = placeholders['num_features_nonzero']
@@ -377,26 +385,26 @@ class NTN(Layer):
                     bias = self.vars['bias']
 
             output_list = []
-            bs = FLAGS.batchsize
-            k = FLAGS.k
             for i in range(self.output_dim):
                 mid_res_1 = tf.matmul(x1, W[i])
-                mid_res_1 = tf.reshape(mid_res_1, [bs, 1, self.input_dim])
+#                mid_res_1 = tf.reshape(mid_res_1, [bs, 1, self.input_dim])
+                mid_res_1 = tf.expand_dims(mid_res_1, 1)
                 mid_res_1 = tf.matmul(mid_res_1, x2_t)
                 mid_res_1 = tf.squeeze(mid_res_1)
                 
-                mid_res_2 = tf.reshape(x1, [bs, 1, self.input_dim])
-                mid_res_2 = tf.tile(mid_res_2, [1, bs+k, 1])
+#                mid_res_2 = tf.reshape(x1, [bs, 1, self.input_dim])
+                mid_res_2 = tf.expand_dims(x1, 1)
+                multiples = tf.cast(tf.shape(x2)/tf.shape(mid_res_2), tf.int32)
+                mid_res_2 = tf.tile(mid_res_2, multiples)
                 mid_res_2 = tf.concat([mid_res_2, x2], axis=2)
                 mid_res_2 = mul_3D2D(mid_res_2, V[i], 
-                                     2*self.input_dim,
-                                     k+bs, 1)
+                                     2*self.input_dim)
                 mid_res_2 = tf.squeeze(mid_res_2)
                 
                 mid_res = mid_res_1+mid_res_2
                 if self.bias:
                     mid_res = mid_res + bias[i]
-                mid_res = tf.reshape(mid_res, [bs*(k+bs),1])
+                mid_res = tf.reshape(mid_res, [-1,1])
                 output_list.append(mid_res)
                 
             output = tf.concat(output_list, axis=1)

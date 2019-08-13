@@ -425,7 +425,6 @@ else:
         
     
         for j, tup in enumerate(zip(codes, embs)):
-            print(i+j)
             code = tup[0]
             emb = tup[1]
             # ignore all padding graphs

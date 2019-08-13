@@ -35,7 +35,7 @@ seed = 123
 np.random.seed(seed)
 tf.set_random_seed(seed)
 
-train = True
+train = False
 
 #chkp.print_tensors_in_checkpoint_file("SavedModel/model_rank.ckpt", tensor_name='', all_tensors=True, all_tensor_names=True)
 
@@ -124,8 +124,8 @@ if train:
     print("Model saved in path: {}".format(save_path))
 
 else:
-    saver.restore(sess, "SavedModel/model_rank.ckpt")
-    print("Model restored from SavedModel/model_rank.ckpt")
+    saver.restore(sess, "../SavedModel/0811-emb/model_rank.ckpt")
+    print("Model restored from ../SavedModel/0811-emb/model_rank.ckpt")
 
 
 
@@ -324,6 +324,10 @@ f1_scores_nz = [[] for i in range(t_max)]
 ret_size = [[] for i in range(t_max)]
 
 
+top_k_query_time = []
+range_query_time = [[] for i in range(t_max)]
+
+
 MSE_test_con = 0
 MSE_test_dis = 0
 test_ged_cnt = {}
@@ -451,8 +455,10 @@ else:
 
             if test_top_k:
                 # top k query
-                est_top_k_wrp = PQ(maxsize=FLAGS.top_k)
+                query_time = time.time()
+             
 
+                est_top_k_wrp = PQ(maxsize=FLAGS.top_k)
                 for gid in id2emb.keys():
                     emb1 = np.array(emb)
                     emb2 = np.array(id2emb[gid])
@@ -469,6 +475,7 @@ else:
                     item = est_top_k_wrp.get()
                     est_top_k[FLAGS.top_k-1-idx] = item[1]
                 
+                top_k_query_time.append(time.time()-query_time)
 
                 pos = FLAGS.top_k
                 while ground_truth[q][pos][1] == ground_truth[q][pos-1][1]:
@@ -517,6 +524,7 @@ else:
             # range query
             if test_range_query:
                 cur_pos = 0
+                query_time = time.time()
                 for t in range(1,t_max):
                     
                     query_time = time.time()
@@ -535,7 +543,8 @@ else:
                     if i + j == 0:
                         print('t={:d}, cost {:f} s'.format(t, time.time()-query_time))
 
-
+                    range_query_time[t-1].append(time.time()-query_time)
+                    
                     ret_size[t-1].append(len(similar_set))
 
                     while cur_pos < len(ground_truth[q]) and\
@@ -593,6 +602,7 @@ if test_top_k:
     print('average precision at k = {:f}'.format(sum(PAtKs)/len(PAtKs)))
     print('average rho = {:f}'.format(sum(SRCCs)/len(SRCCs)))
     print('average tau = {:f}'.format(sum(KRCCs)/len(KRCCs)))
+    print('average search time = {:f}'.format(sum(top_k_query_time)/len(top_k_query_time)))
 
 if test_range_query:
     print('For range query')
@@ -603,6 +613,8 @@ if test_range_query:
         print('average recall = %f'%(sum(recalls[t-1])/len(recalls[t-1])), end = ' ')
         print('average f1-score = %f'%(sum(f1_scores[t-1])/len(f1_scores[t-1])), end = ' ')
         print('average return size = %f'%(sum(ret_size[t-1])/len(ret_size[t-1])))
+        print('average search time = {:f}'.format(sum(range_query_time[t-1])/len(range_query_time[t-1])))
+
 
     print('ignore empty answers')
     for t in range(1,t_max):
