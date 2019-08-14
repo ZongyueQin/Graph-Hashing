@@ -21,18 +21,18 @@ class SimGNN(Model):
 
         self.build()
         
-        self.build_plhd()
-        
         
     def _loss(self):
         # Weight decay loss
+        self.loss = 0
         for layer_type in self.layers:
             for layer in layer_type:
                 for var in layer.vars.values():
                     self.loss += FLAGS.weight_decay * tf.nn.l2_loss(var)
 
-        self.loss += MSE_Loss_SimGNN(self.pred, self.labels, self.gen_labels)
-        
+        self.mse_loss, self.pred, self.lab = MSE_Loss_SimGNN(self.pred, self.labels, self.gen_labels)
+        self.loss += self.mse_loss       
+
     def _accuracy(self):
         pass
         
@@ -85,17 +85,19 @@ class SimGNN(Model):
                                                     dropout=FLAGS.dropout>0,
                                                     logging=self.logging))
        
+        interact_layers = []
 
-        mlp_layers = []
-        mlp_layers.append(SplitIntoPairs(logging=self.logging))
+        interact_layers.append(SplitIntoPairs(logging=self.logging))
         
-        mlp_layers.append(NTN(input_dim=FLAGS.hidden1+FLAGS.hidden2+FLAGS.hidden3, 
+        interact_layers.append(NTN(input_dim=FLAGS.hidden1+FLAGS.hidden2+FLAGS.hidden3, 
                                    output_dim=FLAGS.hidden4, 
                                    placeholders=self.placeholders, 
                                    act=tf.nn.relu,
                                    dropout=FLAGS.dropout>0,
                                    bias=True,
                                    logging=self.logging))
+
+        mlp_layers = []
 
 
         mlp_layers.append(Dense(input_dim=FLAGS.hidden4,
@@ -137,12 +139,17 @@ class SimGNN(Model):
         
 
         
-        self.layers = [conv_layers, pool_layers, mlp_layers]
+        self.layers = [conv_layers, pool_layers, interact_layers, mlp_layers]
 
     def build(self):
         """ Wrapper for _build() """
         with tf.variable_scope(self.name):
             self._build()
+        self.build_train()
+        self.build_feat()
+        self.build_pred()
+
+    def build_train(self):
 
         # Build layer model
         self.activations.append(self.inputs)
@@ -156,24 +163,30 @@ class SimGNN(Model):
         
         final_graph_emb = tf.concat(self.graph_embs, axis=1)
         self.activations.append([final_graph_emb, hidden[1], hidden[2]])
-        
-        for mlp_layer in self.layers[2]:
+
+        for interact_layer in self.layers[2]:
+            hidden = interact_layer(self.activations[-1])
+            self.activations.append(hidden)
+
+        for mlp_layer in self.layers[3]:
             hidden = mlp_layer(self.activations[-1])
             self.activations.append(hidden)
-            
+                    
         self.outputs = self.activations[-1]
         self.pred = self.outputs[0]
+        #self.shape = tf.shape(self.pred)
         # Store model variables for easy access
         variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.name)
         self.vars = {var.name: var for var in variables}
 
         # Build metrics
         self._loss()
+        
         self._accuracy()
 
         self.opt_op = self.optimizer.minimize(self.loss)
-        
-    def build_plhd(self):
+                
+    def build_feat(self):
         placeholders = self.placeholders
         self.plhd_inputs = [placeholders['features'], 
                        placeholders['support'],
@@ -198,9 +211,25 @@ class SimGNN(Model):
         final_graph_emb = tf.concat(self.plhd_graph_embs, axis=1)
         self.plhd_activations.append([final_graph_emb, hidden[1], hidden[2]])
         
-        for mlp_layer in self.layers[2]:
-            hidden = mlp_layer(self.plhd_activations[-1])
-            self.plhd_activations.append(hidden)
             
-        self.plhd_pred = self.plhd_activations[-1]
+        self.plhd_feat = self.plhd_activations[-1][0]
+
+    def build_pred(self):
+        placeholders = self.placeholders
+        self.pred_inputs = [[placeholders['pred_feat1'],
+                             placeholders['pred_feat2']], 
+                            None, #placeholders['support'],
+                            None] #placeholders['graph_sizes']]
+        self.shape=tf.shape(self.pred_inputs[0][1])
+        self.pred_activations = []
+        self.pred_activations.append(self.pred_inputs)
+        for interact_layer in self.layers[2][1:]:
+            hidden = interact_layer(self.pred_activations[-1])
+            self.pred_activations.append(hidden)
+
+        for simgnn_mlp_layer in self.layers[3]:
+            hidden = simgnn_mlp_layer(self.pred_activations[-1])
+            self.pred_activations.append(hidden)
+
+        self.plhd_pred = self.pred_activations[-1][0]
         

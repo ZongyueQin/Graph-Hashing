@@ -320,11 +320,10 @@ class SplitIntoPairs(Layer):
         k = FLAGS.k
         
         x1, x2 = tf.split(x, [bs, bs*k])
-        print(bs)
-        print(k)
         x2 = tf.reshape(x2, [bs, k, -1])
-        tmp = tf.reshape(x1, [bs, 1, -1])
+        tmp = tf.expand_dims(x1, 1)
         tmp = tf.tile(tmp, [1, bs, 1])
+       # tmp = tf.stack([x1 for i in range(bs)], axis=1)
         x2 = tf.concat([tmp, x2], axis=1)
         
         x = [x1, x2]
@@ -411,3 +410,15 @@ class NTN(Layer):
 
 
         return [self.act(output),inputs[1], inputs[2]]
+
+    def __call__(self, inputs):
+        with tf.name_scope(self.name):
+            if self.logging and not self.sparse_inputs:
+                tf.summary.histogram(self.name + '/inputs0', inputs[0][0])
+                tf.summary.histogram(self.name + '/inputs1', inputs[0][1])
+            outputs = self._call(inputs)
+            if self.logging:
+                tf.summary.histogram(self.name + '/outputs', outputs[0])
+            return outputs
+
+ 

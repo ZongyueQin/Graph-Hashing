@@ -13,7 +13,7 @@ flags.DEFINE_string('node_label_name', 'label', 'Name of node label, none if it\
 # data sample related
 flags.DEFINE_integer('k', 1, 'when training, we would generate k similar graphs for each one of sampled graphs')
 flags.DEFINE_integer('GED_threshold', 10, 'threshold within which 2 graphs are similar')
-flags.DEFINE_integer('batchsize',5,'batch size for training')
+flags.DEFINE_integer('batchsize',3,'batch size for training')
 flags.DEFINE_string('label_type', 'ged', 'whether training label should be binary or ged')
 
 # loss related
@@ -33,11 +33,11 @@ flags.DEFINE_string('model', 'gcn', 'Model string.')  # 'gcn', 'gcn_cheby', 'den
 flags.DEFINE_string('laplacian','gcn','how to compute laplacian')
 
 # layer related
-flags.DEFINE_integer('hidden1', 64, 'Number of units in hidden layer 1.')
-flags.DEFINE_integer('hidden2', 32, 'Number of units in hidden layer 2.')
-flags.DEFINE_integer('hidden3', 16, 'Number of units in hidden layer 3.')
+flags.DEFINE_integer('hidden1', 32, 'Number of units in hidden layer 1.')
+flags.DEFINE_integer('hidden2', 64, 'Number of units in hidden layer 2.')
+flags.DEFINE_integer('hidden3', 128, 'Number of units in hidden layer 3.')
 
-flags.DEFINE_integer('hidden4', 112, 'Number of units in hidden layer 4.')
+flags.DEFINE_integer('hidden4', 256, 'Number of units in hidden layer 4.')
 flags.DEFINE_integer('hidden5', 64, 'Number of units in hidden layer 5.')
 flags.DEFINE_integer('embedding_dim', 256, 'dimension of embeddings')
 
@@ -49,7 +49,7 @@ flags.DEFINE_integer('hash_code_len',32,'length of hash code')
 flags.DEFINE_float('dropout', 0., 'Dropout rate (1 - keep probability).')
 flags.DEFINE_float('valid_percentage', 0, 'percentage of validation set')
 flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate.')
-flags.DEFINE_integer('epochs', 5, 'Number of epochs to train.')
+flags.DEFINE_integer('epochs', 500, 'Number of epochs to train.')
 flags.DEFINE_integer('early_stopping', 50, 'Tolerance for early stopping (# of epochs).')
 flags.DEFINE_integer('last_n', 5, 'last n loss is used to decide early stopping or not')
 

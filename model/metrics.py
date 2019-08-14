@@ -86,6 +86,7 @@ def MSE_Loss_SimGNN(preds, label_1, label_2):
 
     label = tf.reshape(tf.concat([label_1, label_2], axis=1), 
                        [bs*(bs+k)])
+    #label = tf.reshape(label_2, [bs*k])
     preds = tf.squeeze(preds)
     preds = tf.clip_by_value(preds, 0, FLAGS.GED_threshold)
     loss_vec = (preds-label)**2
@@ -96,8 +97,8 @@ def MSE_Loss_SimGNN(preds, label_1, label_2):
                         [bs*(bs+k)])
     
     loss = tf.reduce_mean(loss_vec*w_mask)
-    
-    return loss
+#    loss = tf.reduce_mean(loss_vec)    
+    return loss, preds, label
     
     
 
@@ -141,4 +142,4 @@ def pair_accuracy(codes, labels):
     pass  
     
     
-    
+   

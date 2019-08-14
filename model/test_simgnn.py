@@ -22,7 +22,7 @@ from config import FLAGS
 from DataFetcher import DataFetcher
 import pickle
 
-os.environ['CUDA_VISIBLE_DEVICES']='3,4'
+os.environ['CUDA_VISIBLE_DEVICES']='0,5'
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -72,7 +72,9 @@ placeholders = {
 #    'num_features_nonzero': tf.placeholder(tf.int32),  # helper variable for sparse dropout
     'graph_sizes': tf.placeholder(tf.int32, shape=((1+FLAGS.k)*FLAGS.batchsize)),
     'generated_labels':tf.placeholder(tf.float32, shape=(FLAGS.batchsize, FLAGS.k)),
-    'thres':tf.placeholder(tf.float32, shape=(FLAGS.embedding_dim))
+    'thres':tf.placeholder(tf.float32, shape=(FLAGS.embedding_dim)),
+    'pred_feat1':tf.placeholder(tf.float32,shape=(None, None)),
+    'pred_feat2':tf.placeholder(tf.float32, shape=(None, None, None))
 }
 
 
@@ -101,7 +103,6 @@ if train:
         feed_dict = construct_feed_dict_prefetch(data_fetcher, placeholders)
         # Training step
         outs = sess.run([model.opt_op, model.loss], feed_dict=feed_dict)
-    
         if (epoch+1) % 100 == 0:
             pred,lab = sess.run([model.pred, model.lab], feed_dict=feed_dict)
             print(pred)
@@ -127,14 +128,13 @@ else:
     saver.restore(sess, "SavedModel/model_rank.ckpt")
     print("Model restored from SavedModel/model_rank.ckpt")
 
-"""
+
 
 print('start encoding training data...')
 train_graph_num = data_fetcher.get_train_graphs_num()
 inverted_index = {}
 encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
-all_codes = []
-all_embs = []
+all_feats = []
 
 for i in range(0, train_graph_num, encode_batchsize):
     end = i + encode_batchsize
@@ -149,36 +149,19 @@ for i in range(0, train_graph_num, encode_batchsize):
                                                placeholders, 
                                                idx_list,
                                                'train')
-    codes, embs = sess.run([model.encode_outputs[0],
-                            model.encode_outputs[0]], 
-                            feed_dict = feed_dict)
-    codes = list(codes)
-    codes = codes[0:end-i]
-    all_codes = all_codes + codes
+    plhd_feat = sess.run(model.plhd_feat,
+                         feed_dict = feed_dict)
     
-    embs = list(embs)
-    embs = embs[0:end-i]
-    all_embs = all_embs + embs
+    feats = list(plhd_feat)
+    feats = feats[0:end-i]
+    all_feats = all_feats + feats
     
-all_codes_np = np.array(all_codes)
-#thres = np.mean(all_codes_np, axis=0)
-thres = np.zeros(FLAGS.embedding_dim)
 id2emb = {}
-for i, pair in enumerate(zip(all_codes, all_embs)):
-    code = pair[0]
-    emb = pair[1]
-    code = (np.array(code) > thres).tolist()
-    tuple_code = tuple(code)
+for i, feat in enumerate(all_feats):
     gid = data_fetcher.get_train_graph_gid(i)
-    inverted_index.setdefault(tuple_code, [])
-    inverted_index[tuple_code].append((gid, emb))
-    id2emb[gid] = emb
+    id2emb[gid] = feat
 
-index_file = open('SavedModel/id2emb.pkl', 'wb')
-pickle.dump(id2emb, index_file)
-index_file.close()
-
-print('finish encoding, saved index to SavedModel/id2emb.pkl')
+print('finish encoding')
  
 
 # Compute MSE of estimated GED for training data
@@ -188,33 +171,6 @@ MSE_train_dis = 0
 train_ged_cnt = {}
 pred_cnt = {}
 for i in range(100):
-    
-    #idx1 = data_fetcher.cur_train_sample_ptr
-    #idx2 = idx1 + 1
-    #if idx2 == train_graph_num:
-    #    idx2 = 0
-        
-    #print(idx1)
-    #print(idx2)
-    #feed_dict = construct_feed_dict_prefetch(data_fetcher, placeholders)
-    #lab, pred, embs, gids, var = sess.run([model.lab,model.pred,model.outputs[0],
-    #                                       one_element[9],
-    #                                      model.layers[0][0].vars['weights']], 
-    #                            feed_dict=feed_dict)
-    #print(var)
-    #e=np.zeros((FLAGS.batchsize, FLAGS.batchsize))
-    #for i in range(FLAGS.batchsize):
-    #    for j in range(FLAGS.batchsize):
-    #        emb1 = np.array(embs[i])
-    #        emb2 = np.array(embs[j])
-    #        e[i,j] = np.sum((emb1-emb2)**2)
-    #print(e)
-    #print(pred)
-    #print(lab)
-    #print(embs[0])
-    #print(embs[1])
-    #print(id2emb[gids[0]])
-    #print(id2emb[gids[1]])
     
     idx1 = randint(0, train_graph_num - 1)
     idx2 = randint(0, train_graph_num - 1)
@@ -228,44 +184,32 @@ for i in range(100):
     #print(true_ged)
     train_ged_cnt.setdefault(true_ged, 0)
     train_ged_cnt[true_ged] = train_ged_cnt[true_ged] + 1
-#    idx_list = [idx1, idx2]
 
 
-    while (len(idx_list) < encode_batchsize):
-        idx_list.append(0)
-
-    feed_dict = construct_feed_dict_for_encode(data_fetcher, 
-                                               placeholders, 
-                                               idx_list,
-                                               'train')
-    feed_dict.update({placeholders['thres']: thres})
-    codes, embs, inputs, act = sess.run([model.codes, model.encode_outputs[0], model.ecd_inputs, model.ecd_activations], 
-                          feed_dict = feed_dict)
-    emb1 = np.array(embs[0])
-    emb2 = np.array(embs[1])
     
-    est_ged = np.sum((emb1-emb2)**2)
-
+   # feed_dict = construct_feed_dict_for_encode(data_fetcher, 
+   #                                            placeholders, 
+   #                                            idx_list,
+   #                                            'train')
+    feat1 = np.array([id2emb[data_fetcher.get_train_graph_gid(idx1)]])
+    feat2 = np.array([[id2emb[data_fetcher.get_train_graph_gid(idx2)]]])
+    feed_dict.update({placeholders['pred_feat1']: feat1})
+    feed_dict.update({placeholders['pred_feat2']: feat2})
+    est_ged = sess.run(model.plhd_pred, 
+                      feed_dict = feed_dict)
+#    print(est_ged)
+#    break
     if est_ged > FLAGS.GED_threshold:
         est_ged = FLAGS.GED_threshold
     pred_cnt.setdefault(int(est_ged),0)
     pred_cnt[int(est_ged)] = pred_cnt[int(est_ged)]+1
     MSE_train_con = MSE_train_con + ((true_ged-est_ged)**2)/100
     
-    code1 = np.array(codes[0], dtype=np.float32)
-    code2 = np.array(codes[1], dtype=np.float32)
-    est_ged = np.sum((code1-code2)**2)
-    if est_ged > FLAGS.GED_threshold:
-        est_ged = FLAGS.GED_threshold
-
-    MSE_train_dis = MSE_train_dis + ((true_ged-est_ged)**2)/100
-    
 
 
 print(train_ged_cnt)
 print(pred_cnt)
-print('MSE for training (continuous) = {:f}'.format(MSE_train_con))
-print('MSE for training (discrete) = {:f}'.format(MSE_train_dis))
+print('MSE for training (continuous) = %f'%MSE_train_con)
 
 
 
@@ -320,6 +264,8 @@ f1_scores_nz = [[] for i in range(t_max)]
 
 ret_size = [[] for i in range(t_max)]
 
+top_k_q_time = []
+range_q_time = [[] for i in range(t_max)]
 
 MSE_test_con = 0
 MSE_test_dis = 0
@@ -327,6 +273,8 @@ test_ged_cnt = {}
 pred_cnt = {}
 
 if not has_GT:
+    raise NotImplementedError
+    """
     for i in range(total_query_num):
         idx1 = i
         idx2 = randint(0, train_graph_num - 1)
@@ -388,6 +336,7 @@ if not has_GT:
             est_ged = FLAGS.GED_threshold
 
         MSE_test_dis = MSE_test_dis + ((true_ged-est_ged)**2)/total_query_num
+    """
 else:
     for i in range(0, total_query_num, encode_batchsize):   
 
@@ -406,20 +355,16 @@ else:
                                                   placeholders, 
                                                   idx_list,
                                                   'test')
-        feed_dict.update({placeholders['thres']: thres})
         
-        codes, embs = sess.run([model.codes, model.encode_outputs[0]], 
-                                   feed_dict = feed_dict)
+        feats = sess.run(model.plhd_feat, 
+                         feed_dict = feed_dict)
         
     
-        for j, tup in enumerate(zip(codes, embs)):
-            code = tup[0]
-            emb = tup[1]
+        for j, feat in enumerate(feats):
             # ignore all padding graphs
             if i + j >= total_query_num:
                 break
 
-            tuple_code = tuple(code)
             q = data_fetcher.get_test_graph_gid(i + j)
 
             ground_truth[q] = sorted(ground_truth[q], 
@@ -429,10 +374,14 @@ else:
             for pair in ground_truth[q][0:encode_batchsize]:
                 true_ged = pair[1]  
                 gid = pair[0]
-                emb_train = id2emb[gid]
-                emb1 = np.array(emb)
-                emb2 = np.array(emb_train)    
-                est_ged = np.sum((emb1-emb2)**2)
+                feat_train = id2emb[gid]
+                feat1 = np.array([feat])
+                feat2 = np.array([[feat_train]])    
+                feed_dict.update({placeholders['pred_feat1']: feat1})
+                feed_dict.update({placeholders['pred_feat2']: feat2})
+                est_ged = sess.run(model.plhd_pred, 
+                                   feed_dict = feed_dict)
+#
                 if est_ged > FLAGS.GED_threshold:
                     est_ged = FLAGS.GED_threshold
 
@@ -444,28 +393,60 @@ else:
             # compute code and embedding for training graphs
             # To adjust to the size of placeholders, we add some graphs for padding
             
-
+            
 
             if test_top_k:
                 # top k query
                 est_top_k_wrp = PQ(maxsize=FLAGS.top_k)
-
+                feat2 = []
+                gids = []
+                feat1 = np.array([feat])
+                query_time = time.time()
                 for gid in id2emb.keys():
-                    emb1 = np.array(emb)
-                    emb2 = np.array(id2emb[gid])
-                    est_ged = np.sum((emb1-emb2)**2)
-                    item = (-est_ged, gid)
-                    if est_top_k_wrp.full():
-                        maxItem = est_top_k_wrp.get()
-                        if maxItem[0] > item[0]:
-                            item = maxItem
-                    est_top_k_wrp.put(item, block=False)
+#                    emb1 = np.array(emb)
+#                    emb2 = np.array(id2emb[gid])
+#                    est_ged = np.sum((emb1-emb2)**2)
+                    feat2.append(id2emb[gid])
+                    gids.append(gid)
+                    if len(feat2) == encode_batchsize:
+                        feat2 = np.array([feat2])
+                        feed_dict.update({placeholders['pred_feat1']: feat1})
+                        feed_dict.update({placeholders['pred_feat2']: feat2})
+                        est_geds = sess.run(model.plhd_pred, 
+                                            feed_dict = feed_dict)
+                        est_geds = list(est_geds)
+                        for est_ged, gid in zip(est_geds, gids):
+                            item = (-est_ged, gid)
+                            if est_top_k_wrp.full():
+                                maxItem = est_top_k_wrp.get()
+                                if maxItem[0] > item[0]:
+                                    item = maxItem
+                            est_top_k_wrp.put(item, block=False)
+                        feat2 = []
+                        gids = []
+
+                if len(feat2) > 0:
+                    feat2 = np.array([feat2])
+                    feed_dict.update({placeholders['pred_feat1']: feat1})
+                    feed_dict.update({placeholders['pred_feat2']: feat2})
+                    est_geds = sess.run(model.plhd_pred, 
+                                        feed_dict = feed_dict)
+                    est_geds = list(est_geds)
+                    for est_ged, gid in zip(est_geds, gids):
+                        item = (-est_ged, gid)
+                        if est_top_k_wrp.full():
+                            maxItem = est_top_k_wrp.get()
+                            if maxItem[0] > item[0]:
+                                item = maxItem
+                        est_top_k_wrp.put(item, block=False)
+                    feat2 = []
+                    gids = []
 
                 est_top_k = [0 for idx in range(FLAGS.top_k)]
                 for idx in range(FLAGS.top_k):
                     item = est_top_k_wrp.get()
                     est_top_k[FLAGS.top_k-1-idx] = item[1]
-                
+                top_k_q_time.append(time.time()-query_time)
 
                 pos = FLAGS.top_k
                 while ground_truth[q][pos][1] == ground_truth[q][pos-1][1]:
@@ -510,25 +491,53 @@ else:
                 KRCCs.append(tau)
 
 
-        
+             
             # range query
             if test_range_query:
+                feat1 = np.array([feat])
                 cur_pos = 0
                 for t in range(1,t_max):
                     
                     query_time = time.time()
                     similar_set = set()
-                    
+                    feat2 = []
                     for gid in id2emb.keys():
-                        emb1 = np.array(emb)
-                        emb2 = np.array(id2emb[gid])
-                        est_ged = np.sum((emb1-emb2)**2)
-                        if est_ged > FLAGS.GED_threshold:
-                            est_ged = FLAGS.GED_threshold
-
-                        if est_ged < t:
-                            similar_set.add(gid)
+#                    emb1 = np.array(emb)
+#                    emb2 = np.array(id2emb[gid])
+#                    est_ged = np.sum((emb1-emb2)**2)
+                        feat2.append(id2emb[gid])
+                        gids.append(gid)
+                        if len(feat2) == encode_batchsize:
+                            feat2 = np.array([feat2])
+                            feed_dict.update({placeholders['pred_feat1']: feat1})
+                            feed_dict.update({placeholders['pred_feat2']: feat2})
+                            est_geds = sess.run(model.plhd_pred, 
+                                                feed_dict = feed_dict)
+                            est_geds = list(est_geds)
                     
+                            for ged, gid in zip(est_geds, gids):
+                                if ged > FLAGS.GED_threshold:
+                                    ged = FLAGS.GED_threshold
+                                if ged <= t:
+                                    similar_set.add(gid)
+                            feat2 = []
+                            gids = []
+
+                    if len(feat2) > 0:
+                        feat2 = np.array([feat2])
+                        feed_dict.update({placeholders['pred_feat1']: feat1})
+                        feed_dict.update({placeholders['pred_feat2']: feat2})
+                        est_geds = sess.run(model.plhd_pred, 
+                                            feed_dict = feed_dict)
+                        est_geds = list(est_geds)
+                    
+                        for ged, gid in zip(est_geds, gids):
+                            if ged > FLAGS.GED_threshold:
+                                ged = FLAGS.GED_threshold
+                            if ged <= t:
+                                similar_set.add(gid)
+ 
+                    range_q_time[t-1].append(time.time()-query_time)
                     if i + j == 0:
                         print('t={:d}, cost {:f} s'.format(t, time.time()-query_time))
 
@@ -579,17 +588,17 @@ else:
                     f1_scores[t-1].append(f1_score)
                     if len(real_sim_set) > 0:
                         f1_scores_nz[t-1].append(f1_score)
-
+            
 print(test_ged_cnt)
 print(pred_cnt)
-print('MSE for test (continuous) = {:f}'.format(MSE_test_con))
-print('MSE for test (discrete) = {:f}'.format(MSE_test_dis))
+print('MSE for test (continuous) = %f'%MSE_test_con)
 
 if test_top_k:
     print('For Top-k query, k={:d}'.format(FLAGS.top_k))
     print('average precision at k = {:f}'.format(sum(PAtKs)/len(PAtKs)))
     print('average rho = {:f}'.format(sum(SRCCs)/len(SRCCs)))
     print('average tau = {:f}'.format(sum(KRCCs)/len(KRCCs)))
+    print('average query time = %f'%(sum(top_k_q_time)/len(top_k_q_time)))
 
 if test_range_query:
     print('For range query')
@@ -599,7 +608,8 @@ if test_range_query:
         print('average precision = %f'%(sum(precisions[t-1])/len(precisions[t-1])), end = ' ')
         print('average recall = %f'%(sum(recalls[t-1])/len(recalls[t-1])), end = ' ')
         print('average f1-score = %f'%(sum(f1_scores[t-1])/len(f1_scores[t-1])), end = ' ')
-        print('average return size = %f'%(sum(ret_size[t-1])/len(ret_size[t-1])))
+        print('average return size = %f'%(sum(ret_size[t-1])/len(ret_size[t-1])), end= ' ')
+        print('average query time = %f'%(sum(range_q_time[t-1])/len(range_q_time[t-1])))
 
     print('ignore empty answers')
     for t in range(1,t_max):
@@ -611,5 +621,5 @@ if test_range_query:
     print(ged_cnt)
     print('FLAGS.k={:d}'.format(FLAGS.k))
 
-"""
+
 
