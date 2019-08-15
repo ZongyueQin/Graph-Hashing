@@ -377,8 +377,6 @@ class DataFetcher:
         # remove temporary files
         os.remove(g1_fname)
         os.remove(g2_fname)
-        os.remove(g1_fname+'_ordered')
-        os.remove(g2_fname+'_ordered')
         
         return int(ged)
         

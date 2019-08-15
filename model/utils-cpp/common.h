@@ -9,17 +9,36 @@
 #include <vector>
 #include<sys/types.h>
 #include<fcntl.h>
-
+#include<string.h>
 struct CodePos
 {
 	int code;
 	int pos;
 };
 
-struct GInfo
+class GInfo
 {
+public:
 	uint64_t gid;
 	double emb[300];
+	GInfo()
+	{
+		gid = 0;
+		memset(emb, 0, sizeof(emb));
+	}
+	GInfo(const GInfo& a)
+	{
+		gid = a.gid;
+		for(int i = 0; i < 300; i++)
+			emb[i] = a.emb[i];
+	}
+	GInfo& operator = (const GInfo &a)
+	{
+		gid = a.gid;
+		for(int i = 0; i < 300; i++)
+			emb[i] = a.emb[i];
+		return *this;	
+	}
 };
 
 class InvertedIndexEntry

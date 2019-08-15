@@ -81,12 +81,25 @@ void getTopKByEmb(int K, int graphCnt, GInfo *gInfo, deque<uint64_t>& gid)
 	priority_queue<GInfo, vector<GInfo>, Comp> heap;
 	for(int i = 0; i < graphCnt; i++)
 	{
+		if (gInfo[i].gid == 0)
+		{
+			cout << graphCnt << endl;
+			cout << "gid = 0" << endl;
+			exit(0);
+		}
 		heap.push(gInfo[i]);
 		if (heap.size() > K)
 			heap.pop();
 	}	
 	while (!heap.empty())
 	{
+		if (heap.top().gid == 0)
+		{
+			cout << graphCnt << endl;
+			cout << "heap top gid = 0" << endl;
+			exit(0);
+
+		}
 		gid.push_front(heap.top().gid);
 		heap.pop();
 	}
@@ -155,7 +168,7 @@ int main(int argc, char **argv)
 	// ./query code thres file1 file2 totalCodeCnt totalGraphCnt codeLen embLen fine-grained embedding
 	if (argc <= 9)
 	{
-		fprintf(stdout, "command format:./query code search_thres file1 file2 totalCodeCnt totalGraphCnt codeLen embLen K [embedding]\n");
+		fprintf(stdout, "command format:./topKQuery code search_thres file1 file2 totalCodeCnt totalGraphCnt codeLen embLen K [embedding]\n");
 		return -1;
 	}
 	uint64_t queryCode = atoi(argv[1]);
@@ -189,7 +202,13 @@ int main(int argc, char **argv)
 		return -1;
 	}
 	close(fd2);
-
+	/*for(int i = 0; i < totalGraphCnt; i++)
+		if (invertedIndexValue[i].gid == 0)
+        	{
+			cout << "invertedIndexValue gid = 0" << endl;
+			return -1;
+		}   
+	cout << "nothing wrong" << endl;*/
         int codeLen = atoi(argv[7]);
 	int embLen = atoi(argv[8]); 
 	GInfo qInfo;
@@ -213,14 +232,26 @@ int main(int argc, char **argv)
 		for(int i = 0; i < validCode.size(); i++)
 		{
 			int start = code2Pos[validCode[i]].pos;
-			int end = code2Pos[validCode[i]+1].pos;
+			int end;
+			if (validCode[i]+1 == totalCodeCnt)
+				end = totalGraphCnt;
+			else
+				end = code2Pos[validCode[i]+1].pos;
 			for(int j = start; j < end; j++)
 			{
-				candidates[pos] = invertedIndexValue[j];
+//				candidates[pos] = invertedIndexValue[j];
+				if (invertedIndexValue[j].gid == 0)
+				{
+					cout << "invertedIndex gid = 0" << endl;
+				}
+				candidates[pos].gid = invertedIndexValue[j].gid;
+				for(int dim = 0; dim < embLen; dim++)
+					candidates[pos].emb[dim] = invertedIndexValue[j].emb[dim];
 				pos++;
 //				printf("%ld\n", invertedIndexValue[j].gid);
 			}
 		}
+		assert(ret == pos);
 		getTopKByEmb(K, ret, candidates, gids);
 	}
 	else

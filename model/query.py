@@ -371,7 +371,10 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
             if i + j == 0:
                 print('top {:d}, cost {:f} s'.format(FLAGS.top_k, time.time()-start_time))
                 # print(ret)
-            est_top_k = [int(gid) for gid in ret.split()]
+            try:
+                est_top_k = [int(gid) for gid in ret.split()]
+            except ValueError:
+                raise RuntimeError('subprocess ret'+ret)
 
             pos = FLAGS.top_k
             while ground_truth[q][pos][1] == ground_truth[q][pos-1][1]:
@@ -398,8 +401,13 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
                     real_rank_all[gid] = pos + 1
                     last_rank = pos + 1
                     last_d = d
+            try:
+                real_rank = [real_rank_all[gid] for gid in est_top_k]
+            except KeyError:
+                print(ret)
+                print(est_top_k)
+                raise RuntimeError('')
 
-            real_rank = [real_rank_all[gid] for gid in est_top_k]
             tie_handler = {}
             for pos, rk in enumerate(real_rank):
                 if rk in tie_handler.keys():
@@ -433,14 +441,12 @@ def rangeQueryVerification(q_idx, candidate_set, data_fetcher, upbound):
                                        str(upbound),
                                        str(FLAGS.beam_width)])
         # remove temporary files
-        os.remove(q_fname)
         os.remove(g2_fname)
-        os.remove(q_fname+'_ordered')
-        os.remove(g2_fname+'_ordered')
         
         if int(ged) != -1:
             ret_set.add(gid)
             
+    os.remove(q_fname)
     return ret_set
     
     

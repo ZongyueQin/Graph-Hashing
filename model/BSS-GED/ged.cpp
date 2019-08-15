@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 	
 	vector<graph> queryDB = graph::readGraphMemory(query_out.c_str(), totalQuery);
 	vector<graph> graphDB = graph::readGraphMemory(db_out.c_str(), totalGraph);
-//	std::remove(db_out.c_str()); std::remove(query_out.c_str());
+	std::remove(db_out.c_str()); std::remove(query_out.c_str());
 	int i = 0, j = 0, bound;	
 	int sum = 0; 
 	struct timeval start,end; 
