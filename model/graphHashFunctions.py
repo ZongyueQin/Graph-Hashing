@@ -2,6 +2,7 @@ from layers import *
 from metrics import *
 from models import Model
 import tensorflow as tf
+import numpy as np
 
 from config import FLAGS
 
@@ -164,9 +165,8 @@ class GraphHash_Naive(Model):
 
 
 
-
-
-class GraphHash_Rank(GraphHash_Naive):
+""" One output, continuous embedding """
+class GraphHash_Emb(GraphHash_Naive):
     def __init__(self, placeholders, input_dim, next_ele, **kwargs):
         super(GraphHash_Naive, self).__init__(**kwargs)
 
@@ -239,7 +239,8 @@ class GraphHash_Rank(GraphHash_Naive):
         self.pred = pred
         self.lab = lab
 
-class GraphHash_Rank_Reg(GraphHash_Rank):
+""" one output, discrete code, trained with regularizer """
+class GraphHash_Code(GraphHash_Emb):
     def __init__(self, placeholders, input_dim, next_ele, **kwargs):
         super(GraphHash_Naive, self).__init__(**kwargs)
 
@@ -290,6 +291,7 @@ class GraphHash_Rank_Reg(GraphHash_Rank):
 
 
 
+""" Two output, embedding and code """
 class GraphHash_Emb_Code(Model):
     def __init__(self, placeholders, input_dim, next_ele, **kwargs):
         super(GraphHash_Emb_Code, self).__init__(**kwargs)
@@ -311,7 +313,7 @@ class GraphHash_Emb_Code(Model):
         
         self.build_encode()
             
-           
+        
     def _build(self):
         
         conv_layers = []
@@ -480,7 +482,7 @@ class GraphHash_Emb_Code(Model):
             hidden = mlp_layer(self.ecd_activations[-1])
             self.ecd_activations.append(hidden)
  
-        self.ecd_embeddings = self.ecd_activations[-1]
+        self.ecd_embeddings = self.ecd_activations[-1][0]
       
         for discrete_layer in self.layers[3]:
             hidden = discrete_layer(self.ecd_activations[-1])
@@ -518,7 +520,13 @@ class GraphHash_Emb_Code(Model):
     def _accuracy(self):
         pass
     
-
+    def getGEDByEmb(self, emb1, emb2):
+        np.sum((emb1-emb2)**2)
+        
+    def getGEDByCode(self, code1, code2):
+        np.sum((code1-code2)**2)
+    
+""" This model is for binary label """
 class GraphHash_Emb_Code_Binary(GraphHash_Emb_Code):
 #    def __init__(self, placeholders, input_dim, next_ele, **kwargs):
 #        super(GraphHash_Emb_Code, self).__init__(placeholders, input_dim, next_ele, **kwargs)

@@ -176,5 +176,102 @@ def writeInvertedIndex(filename, index, embLen = FLAGS.hash_code_len):
             f.write(string+'\n')
             
     f.close()
+    
+""" encode training data with model that outputs both continuous embedding
+    and discrete code """
+def encodeTrainingData(sess, model, data_fetcher, placeholders,
+                       use_emb=True, use_code=True):
+    print('start encoding training data...')
+    train_graph_num = data_fetcher.get_train_graphs_num()
+    inverted_index = {}
+    encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
+    all_codes = []
+    all_embs = []
+    thres = np.zeros(FLAGS.hash_code_len)
+    
+    for i in range(0, train_graph_num, encode_batchsize):
+        end = i + encode_batchsize
+        if end > train_graph_num:
+            end = train_graph_num
+        idx_list = list(range(i,end))
+        # padding to fit placeholders' shapes
+        while (len(idx_list) < encode_batchsize):
+            idx_list.append(0)
+        
+        feed_dict = construct_feed_dict_for_encode(data_fetcher, 
+                                                   placeholders, 
+                                                   idx_list,
+                                                   'train')
+        feed_dict.update({placeholders['thres']: thres})
+        
+        if use_code and use_emb:
+            codes, embs = sess.run([model.codes,
+                                    model.ecd_embeddings], 
+                                    feed_dict = feed_dict)
+            codes = list(codes)
+            codes = codes[0:end-i]
+            all_codes = all_codes + codes
+    
+            embs = list(embs)
+            embs = embs[0:end-i]
+            all_embs = all_embs + embs
+    
+        elif use_code and use_emb == False:
+            codes = sess.run(model.codes, feed_dict=feed_dict)
+            codes = list(codes)
+            codes = codes[0:end-i]
+            all_codes = all_codes + codes
+            all_embs = all_codes
+        elif use_code == False and use_emb:
+            embs = sess.run(model.ecd_embeddings, feed_dict=feed_dict)
+            embs = list(embs)
+            embs = embs[0:end-i]
+            all_embs = all_embs + embs
+            all_codes = all_embs
+        else:
+            raise RuntimeError('use_code and use_emb cannot both be False')
+
+    print('threshold is')
+    print(thres)
+    id2emb = {}
+    id2code = {}
+    for i, pair in enumerate(zip(all_codes, all_embs)):
+        code = pair[0]
+        emb = pair[1]
+        tuple_code = tuple(code)
+        gid = data_fetcher.get_train_graph_gid(i)
+        if use_emb and use_code:
+            inverted_index.setdefault(tuple_code, [])
+            inverted_index[tuple_code].append((gid, emb))
+        if use_code and use_emb == False:
+            inverted_index.setdefault(tuple_code, [])
+            inverted_index[tuple_code].append((gid, None))            
+        if use_emb:
+            id2emb[gid] = emb
+        if use_code:
+            id2code[gid] = code
+            
+    print('finish encoding training data')
+    return inverted_index, id2emb, id2code
+
+def readGroundTruth(f):
+    ged_cnt = {}
+    ground_truth = {}
+    for line in f.readlines():
+        g, q, d = line.split(' ')
+        g = int(g)
+        q = int(q)
+        d = int(d)
+
+        if q not in ground_truth.keys():
+            ground_truth[q] = []
+        ground_truth[q].append((g,d))
+
+        ged_cnt.setdefault(d,0)
+        ged_cnt[d] = ged_cnt[d] + 1
+        
+    return ground_truth, ged_cnt
+    
+
             
         

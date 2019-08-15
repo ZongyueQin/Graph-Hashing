@@ -9,6 +9,7 @@ flags.DEFINE_string('ground_truth_file', 'GT10.txt', 'ground truth file, should 
 flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
 flags.DEFINE_string('node_feat_name','type','Name of node feature')
 flags.DEFINE_string('node_label_name', 'label', 'Name of node label, none if it\'s idx')
+flags.DEFINE_boolean('clip', True, 'clip GED beyond GED_threshold')
 
 # data sample related
 flags.DEFINE_integer('k', 1, 'when training, we would generate k similar graphs for each one of sampled graphs')
