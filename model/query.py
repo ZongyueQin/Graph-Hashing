@@ -5,6 +5,7 @@ import numpy as np
 from scipy.stats import spearmanr, kendalltau
 import subprocess
 import time
+import os
 
 def computeTrainingMSE(sess, model, thres, data_fetcher, placeholders,
                        pair_num=100, use_code=True, use_emb=True):
@@ -419,6 +420,30 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
     print('average search time = {:f}'.format(sum(search_time)/len(search_time)))
     print('average encode time = {:f}'.format(sum(encode_time)/len(encode_time)))
     
+    
+def rangeQueryVerification(q_idx, candidate_set, data_fetcher, upbound):
+    query_graph = data_fetcher.test_graphs[q_idx]
+    q_fname = data_fetcher.writeGraph2TempFile(query_graph)
+    ret_set = set()
+    for gid in candidate_set:
+        g2 = data_fetcher.getGraphByGid(gid)
+        g2_fname = data_fetcher.writeGraph2TempFile(g2)
+
+        ged = subprocess.check_output(['./ged', q_fname, '1', g2_fname, '1', 
+                                       str(upbound),
+                                       str(FLAGS.beam_width)])
+        # remove temporary files
+        os.remove(q_fname)
+        os.remove(g2_fname)
+        os.remove(q_fname+'_ordered')
+        os.remove(g2_fname+'_ordered')
+        
+        if int(ged) != -1:
+            ret_set.add(gid)
+            
+    return ret_set
+    
+    
 def rangeQuery(sess, model, data_fetcher, ground_truth,
               placeholders,
               inverted_index,
@@ -447,6 +472,7 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
     
     search_time = [[] for i in range(t_min, t_max+1)]
     encode_time = []
+    verify_time = [[] for i in range(t_min, t_max+1)]
 
     for i in range(0, total_query_num, encode_batchsize):   
 
@@ -535,10 +561,14 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                 if i + j == 0:
                     print('t={:d}, cost {:f} s'.format(t, time.time()-start_time))
                     
-                    
-                    
-                similar_set = set([int(gid) for gid in ret.split()])
-                # TODO verification 
+                candidate_set = set([int(gid) for gid in ret.split()])
+
+                start_time = time.time()
+                similar_set = rangeQueryVerification(i+j, candidate_set, 
+                                                     data_fetcher,
+                                                     upbound=t)                
+                verify_time[t-t_min].append(time.time()-start_time)
+#                similar_set = set([int(gid) for gid in ret.split()])
 
                 ret_size[t-t_min].append(len(similar_set))
 
@@ -590,30 +620,31 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
     print('average encode time = {:f}'.format(sum(encode_time)/len(encode_time)))
     for t in range(t_min, t_max+1):
         print('threshold = {:d}'.format(t), end=' ')
-        print('empty cnt = {:d}'.format(zero_cnt[t-1]), end = ' ')
-        print('average precision = %f'%(sum(precisions[t-1])/len(precisions[t-1])), end = ' ')
-        print('average recall = %f'%(sum(recalls[t-1])/len(recalls[t-1])), end = ' ')
-        print('average f1-score = %f'%(sum(f1_scores[t-1])/len(f1_scores[t-1])), end = ' ')
-        print('average return size = %f'%(sum(ret_size[t-1])/len(ret_size[t-1])), end = ' ')
-        print('average search time = {:f}'.format(sum(search_time[t-1])/len(search_time[t-1])))
+        print('empty cnt = {:d}'.format(zero_cnt[t-t_min]), end = ' ')
+        print('average precision = %f'%(sum(precisions[t-t_min])/len(precisions[t-t_min])), end = ' ')
+        print('average recall = %f'%(sum(recalls[t-t_min])/len(recalls[t-t_min])), end = ' ')
+        print('average f1-score = %f'%(sum(f1_scores[t-t_min])/len(f1_scores[t-t_min])), end = ' ')
+        print('average return size = %f'%(sum(ret_size[t-t_min])/len(ret_size[t-t_min])), end = ' ')
+        print('average search time = {:f}'.format(sum(search_time[t-t_min])/len(search_time[t-t_min])), end= ' ')
+        print('average search time = {:f}'.format(sum(verify_time[t-t_min])/len(verify_time[t-t_min])))
 
     print('ignore empty answers')
     for t in range(t_min,t_max+1):
         print('threshold = {:d}'.format(t), end = ' ')
-        if len(precisions_nz[t-1]) > 0:
-            ave_pre_nz = sum(precisions_nz[t-1])/len(precisions_nz[t-1])
+        if len(precisions_nz[t-t_min]) > 0:
+            ave_pre_nz = sum(precisions_nz[t-t_min])/len(precisions_nz[t-t_min])
         else:
             ave_pre_nz = float('nan')
         print('average precision = %f'%(ave_pre_nz), end = ' ')
  
-        if len(recalls_nz[t-1]) > 0:
-            ave_rc_nz = sum(recalls_nz[t-1])/len(recalls_nz[t-1])
+        if len(recalls_nz[t-t_min]) > 0:
+            ave_rc_nz = sum(recalls_nz[t-t_min])/len(recalls_nz[t-t_min])
         else:
             ave_rc_nz = float('nan') 
         print('average recall = %f'%(ave_rc_nz), end = ' ')
 
-        if len(f1_scores_nz[t-1]) > 0:
-            ave_f1_nz = sum(f1_scores_nz[t-1])/len(f1_scores_nz[t-1])
+        if len(f1_scores_nz[t-t_min]) > 0:
+            ave_f1_nz = sum(f1_scores_nz[t-t_min])/len(f1_scores_nz[t-t_min])
         else:
             ave_f1_nz = float('nan')
         print('average f1-score = %f'%(ave_f1_nz))

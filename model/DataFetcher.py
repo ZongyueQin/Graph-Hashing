@@ -50,6 +50,8 @@ class DataFetcher:
         self.node_feat_encoder = self._create_node_feature_encoder(
             train_graphs + test_graphs)
 
+        self.gid2graph = {}
+
         self.train_graphs = self.create_wrapper_graph(train_graphs, 'train')
         self.test_graphs = self.create_wrapper_graph(test_graphs, 'test')
         
@@ -58,6 +60,10 @@ class DataFetcher:
         self.cur_train_sample_ptr = 0
         self.cur_valid_sample_ptr = 0
         self.cur_test_sample_ptr = 0
+
+
+    def getGraphByGid(self, gid):
+        return self.gid2graph[gid]
 
     def get_pos_by_gid(self, gid, tvt):
         if tvt == 'train':
@@ -269,6 +275,7 @@ class DataFetcher:
 
     """ create a wrapper object (MyGraph class) for each nxgraph """
     def create_wrapper_graph(self, graphs, tvt):
+        
         rtn = []
         hits = [0, 0.3, 0.6, 0.9]
         cur_hit = 0
@@ -279,6 +286,7 @@ class DataFetcher:
                 print('{} {}/{}={:.1%}'.format(tvt, i, len(graphs), i / len(graphs)))
                 cur_hit += 1
             rtn.append(mg)
+            self.gid2graph[mg.nxgraph.graph['gid']] = mg
         return rtn
 
     """Convert sparse matrix to tuple representation."""
