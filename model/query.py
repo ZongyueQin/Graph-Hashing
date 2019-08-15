@@ -6,6 +6,7 @@ from scipy.stats import spearmanr, kendalltau
 import subprocess
 import time
 import os
+from nx_to_gxl import nx_to_gxl
 
 def computeTrainingMSE(sess, model, thres, data_fetcher, placeholders,
                        pair_num=100, use_code=True, use_emb=True):
@@ -429,7 +430,84 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
     print('average encode time = {:f}'.format(sum(encode_time)/len(encode_time)))
     
     
-def rangeQueryVerification(q_idx, candidate_set, data_fetcher, upbound):
+def traditionalApproxVerification(q_idx, candidate_set, data_fetcher, upbound):
+    candidate_set = list(candidate_set)    
+    n = len(candidate_set)
+    if n == 0:
+        return set()
+    
+    query_xml = os.path.join('tmpfile',
+                             str(time.time())+'.xml')
+    qf = open(query_xml, 'w')
+    qf.write('<?xml version="1.0"?>\n<GraphCollection>\n<graphs>\n')        
+    query_graph = data_fetcher.test_graphs[q_idx]
+    qfname = os.path.join('tmpfile',
+                          str(time.time())+\
+                          str(query_graph.nxgraph.graph['gid'])+'.gxl')
+    nx_to_gxl(query_graph.nxgraph, query_graph.nxgraph.graph['gid'],
+              qfname)
+    qf.write('<print file="{}"/>\n'.format(qfname))
+    qf.write('</graphs>\n</GraphCollection>')
+    qf.close()
+        
+    collection_file = os.path.join('tmpfile',
+                                   str(time.time())+'.xml')
+    f = open(collection_file, 'w')
+    f.write('<?xml version="1.0"?>\n<GraphCollection>\n<graphs>\n')        
+    fnames = []
+    for gid in candidate_set:
+        g = data_fetcher.getGraphByGid(gid)
+        fname = os.path.join('tmpfile',
+                             str(time.time())+\
+                             str(g.nxgraph.graph['gid'])+'.gxl')
+
+        nx_to_gxl(g.nxgraph, g.nxgraph.graph['gid'], fname)
+        f.write('<print file="{}"/>\n'.format(fname))
+        fnames.append(fname)     
+            
+    f.write('</graphs>\n</GraphCollection>')
+    f.close()
+        
+    ged_1 = subprocess.check_output(['java', '-cp', 
+                                     'graph-matching-toolkit/src',
+                                     'algorithms.GraphMatching',
+                                     data_fetcher.data_dir+'/prop/VJ.prop',
+                                     collection_file, 
+                                     query_xml])
+    
+    ged_2 = subprocess.check_output(['java', '-cp', 
+                                     'graph-matching-toolkit/src',
+                                     'algorithms.GraphMatching',
+                                     data_fetcher.data_dir+'/prop/beam.prop',
+                                     collection_file, 
+                                     query_xml])
+    
+    ged_3 = subprocess.check_output(['java', '-cp', 
+                                     'graph-matching-toolkit/src',
+                                     'algorithms.GraphMatching',
+                                     data_fetcher.data_dir+'/prop/hungarian.prop',
+                                     collection_file, 
+                                     query_xml])
+
+    ged_1_list = ged_1.split()
+    ged_2_list = ged_2.split()
+    ged_3_list = ged_3.split()
+    ret_set = set()
+    for i in range(n):
+        ged = min([float(ged_1_list[i]), 
+                   float(ged_2_list[i]), 
+                   float(ged_3_list[i])])
+        if ged <= upbound:
+            ret_set.append(candidate_set[i])
+    
+    os.remove(collection_file)
+    for fname in fnames:
+        os.remove(fname)
+    os.remove(query_xml)
+    os.remove(qfname)
+    return ret_set
+    
+def BssGedVerification(q_idx, candidate_set, data_fetcher, upbound):
     query_graph = data_fetcher.test_graphs[q_idx]
     q_fname = data_fetcher.writeGraph2TempFile(query_graph)
     ret_set = set()
@@ -450,6 +528,29 @@ def rangeQueryVerification(q_idx, candidate_set, data_fetcher, upbound):
     return ret_set
     
     
+def rangeQueryVerification(q_idx, candidate_set, data_fetcher, upbound):
+    if upbound > 6:
+        return traditionalApproxVerification(q_idx, data_fetcher, candidate_set,
+                                             upbound)
+    
+    query_graph = data_fetcher.test_graphs[q_idx]
+    if len(query_graph.nxgraph.nodes()) > 20:
+        return traditionalApproxVerification(q_idx, candidate_set,
+                                             data_fetcher,
+                                             upbound)
+    
+    candidate_set_small = set()
+    candidate_set_big = set()
+    for gid in candidate_set:
+        g = data_fetcher.getGraphByGid(gid)
+        if len(g.nxgraph.nodes()) > 20:
+            candidate_set_big.add(gid)
+        else:
+            candidate_set_small.add(gid)
+            
+    return BssGedVerification(q_idx, candidate_set_small, data_fetcher, upbound) |\
+    traditionalApproxVerification(q_idx, candidate_set_big, data_fetcher, upbound)
+
 def rangeQuery(sess, model, data_fetcher, ground_truth,
               placeholders,
               inverted_index,
