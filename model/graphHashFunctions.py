@@ -521,10 +521,10 @@ class GraphHash_Emb_Code(Model):
         pass
     
     def getGEDByEmb(self, emb1, emb2):
-        np.sum((emb1-emb2)**2)
+        return np.sum((emb1-emb2)**2)
         
     def getGEDByCode(self, code1, code2):
-        np.sum((code1-code2)**2)
+        return np.sum((code1-code2)**2)
     
 """ This model is for binary label """
 class GraphHash_Emb_Code_Binary(GraphHash_Emb_Code):

@@ -58,8 +58,8 @@ dataset = tf.data.Dataset.from_generator(data_fetcher.get_train_data,
                                            tf.TensorShape([None,2]),# laplacian sparse index
                                            tf.TensorShape([None]), #laplacian sparse value
                                            tf.TensorShape([2]), # laplacian sparse shape
-                                           #tf.TensorShape([(1+FLAGS.k)*FLAGS.batchsize]),
-                                           tf.TensorShape([None]), # shape
+                                           tf.TensorShape([(1+FLAGS.k)*FLAGS.batchsize]), #shape
+                                           #tf.TensorShape([None]), # shape
                                            tf.TensorShape([FLAGS.batchsize, FLAGS.batchsize]),#label
                                            tf.TensorShape([FLAGS.batchsize, FLAGS.k]),# gen_label
                                            ))
@@ -75,8 +75,8 @@ placeholders = {
     'features': tf.sparse_placeholder(tf.float32, shape=(None, data_fetcher.get_node_feature_dim())),
     'labels': tf.placeholder(tf.float32, shape=(FLAGS.batchsize, FLAGS.batchsize)),
     'dropout': tf.placeholder_with_default(0., shape=()),
-#    'graph_sizes': tf.placeholder(tf.int32, shape=((1+FLAGS.k)*FLAGS.batchsize)),
-    'graph_sizes': tf.placeholder(tf.int32, shape=(None)),
+    'graph_sizes': tf.placeholder(tf.int32, shape=((1+FLAGS.k)*FLAGS.batchsize)),
+#    'graph_sizes': tf.placeholder(tf.int32, shape=(None)),
     'generated_labels':tf.placeholder(tf.float32, shape=(FLAGS.batchsize, FLAGS.k)),
     'thres':tf.placeholder(tf.float32, shape=(FLAGS.hash_code_len))
 }
@@ -106,9 +106,9 @@ else:
     print("Model restored from", model_path)
 
 
-inverted_index, id2emb, id2code = encodeTrainingDataEmbCode(sess, model, 
-                                                            data_fetcher, 
-                                                            placeholders)
+inverted_index, id2emb, id2code = encodeTrainingData(sess, model, 
+                                                     data_fetcher, 
+                                                     placeholders)
 
 index_file = open('SavedModel/inverted_index_rank.pkl', 'wb')
 pickle.dump(inverted_index, index_file)
@@ -165,9 +165,13 @@ else:
                                       id2emb, id2code)
     
     if test_top_k == True:
-        topKQuery()
+        topKQuery(sess, model, data_fetcher, ground_truth,
+              inverted_index,
+              placeholders)
         
     if test_range_query == True:
-        rangeQuery()
+        rangeQuery(sess, model, data_fetcher, ground_truth,
+              placeholders,
+              inverted_index)
         
 

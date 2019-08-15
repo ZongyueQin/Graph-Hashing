@@ -282,10 +282,12 @@ def computeTestMSEWithGroundTruth(sess, model, thres, placeholders,
 def topKQuery(sess, model, data_fetcher, ground_truth,
               inverted_index,
               placeholders,
-              index_value_fname='SavedModel/inverted_index.index',
-              index_index_fname='SavedModel/inverted_index.value',
-              input_batchsize = 1,
+              index_index_fname='SavedModel/inverted_index.index',
+              index_value_fname='SavedModel/inverted_index.value',
+              #input_batchsize = 1,
               use_code=True, use_emb=True):
+    thres = np.zeros(FLAGS.hash_code_len)
+
     total_query_num = data_fetcher.get_test_graphs_num()
     train_graph_num = data_fetcher.get_train_graphs_num()
     PAtKs = []
@@ -293,14 +295,20 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
     KRCCs = []
     search_time = []
     encode_time = []
+    encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
 
-    for i in range(0, total_query_num, input_batchsize):   
+    for i in range(0, total_query_num, encode_batchsize):   
 
-        end = i + input_batchsize
+        end = i + encode_batchsize
         if end > total_query_num:
             end = total_query_num
 
+        
         for j in range(i, end):
+
+            if i + j >= total_query_num:
+                break
+
             q = data_fetcher.get_test_graph_gid(i + j)
             ground_truth[q] = sorted(ground_truth[q], 
                                      key=lambda x: x[1]*10000000 + x[0])
@@ -310,6 +318,8 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
 #        while (len(idx_list) < encode_batchsize):
 #            idx_list.append(0)
         idx_list = list(range(i,end))           
+        while (len(idx_list) < encode_batchsize):
+            idx_list.append(0)
 
         feed_dict = construct_feed_dict_for_query(data_fetcher, 
                                                   placeholders, 
@@ -333,6 +343,9 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
         encode_time.append(time.time()-start_time)
     
         for j, tup in enumerate(zip(codes, embs)):
+            if i + j >= total_query_num:
+                break
+
             code = tup[0]
             emb = tup[1]
             # ignore all padding graphs
@@ -355,10 +368,9 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
              
             search_time.append(time.time()-start_time)
             if i + j == 0:
-                print('top {:d}, cost {:f} s'.format(FLAGS.top_k, time.time()-query_time))
+                print('top {:d}, cost {:f} s'.format(FLAGS.top_k, time.time()-start_time))
                 # print(ret)
             est_top_k = [int(gid) for gid in ret.split()]
-
 
             pos = FLAGS.top_k
             while ground_truth[q][pos][1] == ground_truth[q][pos-1][1]:
@@ -411,13 +423,16 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
               placeholders,
               inverted_index,
               t_min = 1, t_max=FLAGS.GED_threshold-2,
-              index_value_fname='SavedModel/inverted_index.index',
-              index_index_fname='SavedModel/inverted_index.value',
-              input_batchsize = 1,
+              index_index_fname='SavedModel/inverted_index.index',
+              index_value_fname='SavedModel/inverted_index.value',
+              #input_batchsize = 1,
               use_code=True, use_emb=True):
+    thres = np.zeros(FLAGS.hash_code_len)
+
     total_query_num = data_fetcher.get_test_graphs_num()
     train_graph_num = data_fetcher.get_train_graphs_num()
-    
+    encode_batchsize=(1+FLAGS.k) * FLAGS.batchsize    
+
     precisions = [[] for i in range(t_min, t_max+1)]
     recalls = [[] for i in range(t_min, t_max+1)]
     f1_scores = [[] for i in range(t_min, t_max+1)]
@@ -430,16 +445,19 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
     ret_size = [[] for i in range(t_min, t_max+1)]
 
     
-    search_time = []
+    search_time = [[] for i in range(t_min, t_max+1)]
     encode_time = []
 
-    for i in range(0, total_query_num, input_batchsize):   
+    for i in range(0, total_query_num, encode_batchsize):   
 
-        end = i + input_batchsize
+        end = i + encode_batchsize
         if end > total_query_num:
             end = total_query_num
 
+
         for j in range(i, end):
+            if i + j >= total_query_num:
+                break
             q = data_fetcher.get_test_graph_gid(i + j)
             ground_truth[q] = sorted(ground_truth[q], 
                                      key=lambda x: x[1]*10000000 + x[0])
@@ -449,6 +467,9 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
 #        while (len(idx_list) < encode_batchsize):
 #            idx_list.append(0)
         idx_list = list(range(i,end))           
+
+        while (len(idx_list) < encode_batchsize):
+            idx_list.append(0)
 
         feed_dict = construct_feed_dict_for_query(data_fetcher, 
                                                   placeholders, 
@@ -473,6 +494,8 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
         encode_time.append(time.time()-start_time)
     
         for j, tup in enumerate(zip(codes, embs)):
+            if i + j >= total_query_num:
+                break
             code = tup[0]
             emb = tup[1]
             # ignore all padding graphs
@@ -510,7 +533,7 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                                                    '-1'])
                 search_time[t-t_min].append(time.time()-start_time)
                 if i + j == 0:
-                    print('t={:d}, cost {:f} s'.format(t, time.time()-query_time))
+                    print('t={:d}, cost {:f} s'.format(t, time.time()-start_time))
                     
                     
                     
@@ -564,6 +587,7 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                     f1_scores_nz[t-t_min].append(f1_score)
 
     print('For range query')
+    print('average encode time = {:f}'.format(sum(encode_time)/len(encode_time)))
     for t in range(t_min, t_max+1):
         print('threshold = {:d}'.format(t), end=' ')
         print('empty cnt = {:d}'.format(zero_cnt[t-1]), end = ' ')
@@ -571,8 +595,7 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
         print('average recall = %f'%(sum(recalls[t-1])/len(recalls[t-1])), end = ' ')
         print('average f1-score = %f'%(sum(f1_scores[t-1])/len(f1_scores[t-1])), end = ' ')
         print('average return size = %f'%(sum(ret_size[t-1])/len(ret_size[t-1])), end = ' ')
-        print('average search time = {:f}'.format(sum(search_time[t-1])/len(search_time[t-1])), end = ' ')
-        print('average search time = {:f}'.format(sum(encode_time[t-1])/len(encode_time[t-1])), end = ' ')
+        print('average search time = {:f}'.format(sum(search_time[t-1])/len(search_time[t-1])))
 
     print('ignore empty answers')
     for t in range(t_min,t_max+1):
