@@ -508,29 +508,32 @@ def traditionalApproxVerification(q_idx, candidate_set, data_fetcher, upbound):
     return ret_set
     
 def BssGedVerification(q_idx, candidate_set, data_fetcher, upbound):
+    candidate_set = list(candidate_set)
     query_graph = data_fetcher.test_graphs[q_idx]
     q_fname = data_fetcher.writeGraph2TempFile(query_graph)
+    g_fname = data_fetcher.writeGraphList2TempFile(candidate_set)
     ret_set = set()
-    for gid in candidate_set:
-        g2 = data_fetcher.getGraphByGid(gid)
-        g2_fname = data_fetcher.writeGraph2TempFile(g2)
 
-        ged = subprocess.check_output(['./ged', q_fname, '1', g2_fname, '1', 
-                                       str(upbound),
-                                       str(FLAGS.beam_width)])
-        # remove temporary files
-        os.remove(g2_fname)
+    geds = subprocess.check_output(['./ged', q_fname, '1', g_fname, 
+                                   str(len(candidate_set)), 
+                                   str(upbound),
+                                   str(FLAGS.beam_width)])
         
+    for i, ged in enumerate(geds.split()):
+
         if int(ged) != -1:
-            ret_set.add(gid)
+            ret_set.add(candidate_set[i])
+        #print(len(ret_set))
             
     os.remove(q_fname)
+    os.remove(g_fname)
     return ret_set
     
     
 def rangeQueryVerification(q_idx, candidate_set, data_fetcher, upbound):
-    if upbound > 6:
-        return traditionalApproxVerification(q_idx, data_fetcher, candidate_set,
+    
+    if upbound > 3:
+        return traditionalApproxVerification(q_idx, candidate_set, data_fetcher,
                                              upbound)
     
     query_graph = data_fetcher.test_graphs[q_idx]
@@ -550,6 +553,9 @@ def rangeQueryVerification(q_idx, candidate_set, data_fetcher, upbound):
             
     return BssGedVerification(q_idx, candidate_set_small, data_fetcher, upbound) |\
     traditionalApproxVerification(q_idx, candidate_set_big, data_fetcher, upbound)
+    
+
+   # return BssGedVerification(q_idx, candidate_set, data_fetcher, upbound)
 
 def rangeQuery(sess, model, data_fetcher, ground_truth,
               placeholders,
@@ -676,9 +682,12 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                                                      upbound=t)                
                 verify_time[t-t_min].append(time.time()-start_time)
 #                similar_set = set([int(gid) for gid in ret.split()])
+                if i + j == 0:
+                    print('verification time: {:f} s'.format(time.time()-start_time))
 
                 ret_size[t-t_min].append(len(similar_set))
 
+                q = data_fetcher.get_test_graph_gid(i+j)
                 while cur_pos < len(ground_truth[q]) and\
                         ground_truth[q][cur_pos][1] <= t:
                     cur_pos = cur_pos + 1
@@ -694,6 +703,12 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                         precision = 0
                 else:
                     precision =  len(tmp)/len(similar_set)
+                if precision != 1:
+                    if len(similar_set) > 0:
+                        print(q)
+                        print(similar_set)
+                        print(real_sim_set)
+                        raise RuntimeError('bug')
 
                 precisions[t-t_min].append(precision)
                 if len(real_sim_set) > 0:
@@ -733,7 +748,7 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
         print('average f1-score = %f'%(sum(f1_scores[t-t_min])/len(f1_scores[t-t_min])), end = ' ')
         print('average return size = %f'%(sum(ret_size[t-t_min])/len(ret_size[t-t_min])), end = ' ')
         print('average search time = {:f}'.format(sum(search_time[t-t_min])/len(search_time[t-t_min])), end= ' ')
-        print('average search time = {:f}'.format(sum(verify_time[t-t_min])/len(verify_time[t-t_min])))
+        print('average verify time = {:f}'.format(sum(verify_time[t-t_min])/len(verify_time[t-t_min])))
 
     print('ignore empty answers')
     for t in range(t_min,t_max+1):

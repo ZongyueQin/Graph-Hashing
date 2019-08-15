@@ -171,6 +171,6 @@ else:
         
     if test_range_query == True:
         rangeQuery(sess, model, data_fetcher, ground_truth,
-              placeholders, inverted_index, t_max=6)
+              placeholders, inverted_index, t_max=1)
         
 

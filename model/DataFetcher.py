@@ -398,6 +398,38 @@ class DataFetcher:
             self.labels[id2, id1] = FLAGS.GED_threshold
         return
 
+    def writeGraphList2TempFile(self, gid_list):
+
+        fname = 'tmpfile/'+str(time.time()) +  '.tmpfile'
+        f = open(fname, 'w')
+
+        for gid in gid_list:
+            graph = self.gid2graph[gid]
+            nxgraph = graph.nxgraph
+            string = '{:d}\n{:d} {:d}\n'.format(nxgraph.graph['gid'], 
+                                          len(nxgraph.nodes()), 
+                                          len(nxgraph.edges()))
+            f.write(string)
+            label2node = {}
+        
+            for i,n in enumerate(nxgraph.nodes(data=True)):
+                if n[1][self.node_feat_name] not in self.type_hash.keys():
+                    self.type_hash[n[1][self.node_feat_name]] = self.typeCnt
+                    self.typeCnt = self.typeCnt + 1
+                if self.node_label_name != 'none':
+                    label2node[n[1][self.node_label_name]] = i
+                f.write(str(self.type_hash[n[1][self.node_feat_name]])+'\n')
+        
+            for e in nxgraph.edges():
+                if self.node_label_name == 'none':
+                    f.write(str(e[0])+' '+str(e[1])+' 0\n')                
+                else:
+                    f.write(str(label2node[e[0]]) + ' ' + str(label2node[e[1]]) + ' 0\n')
+
+        f.close()
+        return fname
+ 
+
     def writeGraph2TempFile(self, graph):
         nxgraph = graph.nxgraph
         fname = 'tmpfile/'+str(time.time()) + '_'+str(nxgraph.graph['gid']) + '.tmpfile'

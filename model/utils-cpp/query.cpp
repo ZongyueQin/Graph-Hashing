@@ -157,7 +157,12 @@ int main(int argc, char **argv)
 	for(int i = 0; i < validCode.size(); i++)
 	{
 		int start = code2Pos[validCode[i]].pos;
-		int end = code2Pos[validCode[i]+1].pos;
+		int end;
+		if (validCode[i] == totalCodeCnt-1)
+			end = totalGraphCnt;
+		else
+		 	end = code2Pos[validCode[i]+1].pos;
+
 		for(int j = start; j < end; j++)
 		{
 			if (fine_grained > 0 && dist(qInfo, invertedIndexValue[j], embLen) > (double)fine_grained_thres)
