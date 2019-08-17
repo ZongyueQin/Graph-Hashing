@@ -29,14 +29,14 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
 """ Specific which metrics to test """
-test_top_k = True
+test_top_k = False
 test_range_query = True
-train_mse = True
-test_mse = True
+train_mse = False
+test_mse = False
 
 """ train the model or load existing model """
-train = True
-model_path = ""
+train = False
+model_path = "SavedModel/model_rank.ckpt"
 saved_files_dir = "SavedModel"
 
 """ Set random seed """
@@ -171,6 +171,6 @@ else:
         
     if test_range_query == True:
         rangeQuery(sess, model, data_fetcher, ground_truth,
-              placeholders, inverted_index, t_max=1)
+              placeholders, inverted_index, t_min=1, t_max=9)
         
 

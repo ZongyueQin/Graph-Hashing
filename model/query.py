@@ -344,9 +344,12 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
             raise RuntimeError('topKQuery: For now use_emb cannnot be false')
         encode_time.append(time.time()-start_time)
     
+        # start query
         for j, tup in enumerate(zip(codes, embs)):
             if i + j >= total_query_num:
                 break
+
+            q = data_fetcher.get_test_graph_gid(i+j)
 
             code = tup[0]
             emb = tup[1]
@@ -375,7 +378,8 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
             try:
                 est_top_k = [int(gid) for gid in ret.split()]
             except ValueError:
-                raise RuntimeError('subprocess ret'+ret)
+                print(ret)
+                raise RuntimeError('subprocess ret'+str(ret))
 
             pos = FLAGS.top_k
             while ground_truth[q][pos][1] == ground_truth[q][pos-1][1]:
@@ -498,7 +502,7 @@ def traditionalApproxVerification(q_idx, candidate_set, data_fetcher, upbound):
                    float(ged_2_list[i]), 
                    float(ged_3_list[i])])
         if ged <= upbound:
-            ret_set.append(candidate_set[i])
+            ret_set.add(candidate_set[i])
     
     os.remove(collection_file)
     for fname in fnames:
@@ -531,7 +535,7 @@ def BssGedVerification(q_idx, candidate_set, data_fetcher, upbound):
     
     
 def rangeQueryVerification(q_idx, candidate_set, data_fetcher, upbound):
-    
+    """ 
     if upbound > 3:
         return traditionalApproxVerification(q_idx, candidate_set, data_fetcher,
                                              upbound)
@@ -553,9 +557,9 @@ def rangeQueryVerification(q_idx, candidate_set, data_fetcher, upbound):
             
     return BssGedVerification(q_idx, candidate_set_small, data_fetcher, upbound) |\
     traditionalApproxVerification(q_idx, candidate_set_big, data_fetcher, upbound)
-    
-
-   # return BssGedVerification(q_idx, candidate_set, data_fetcher, upbound)
+    """
+    return traditionalApproxVerification(q_idx, candidate_set, data_fetcher, upbound)
+    #return BssGedVerification(q_idx, candidate_set, data_fetcher, upbound)
 
 def rangeQuery(sess, model, data_fetcher, ground_truth,
               placeholders,
@@ -587,6 +591,22 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
     encode_time = []
     verify_time = [[] for i in range(t_min, t_max+1)]
 
+    precisions_cdd = [[] for i in range(t_min, t_max+1)]
+    recalls_cdd = [[] for i in range(t_min, t_max+1)]
+    f1_scores_cdd = [[] for i in range(t_min, t_max+1)]
+
+    precisions_nz_cdd = [[] for i in range(t_min, t_max+1)]
+    recalls_nz_cdd = [[] for i in range(t_min, t_max+1)]
+    f1_scores_nz_cdd = [[] for i in range(t_min, t_max+1)]
+
+    ret_size_cdd = [[] for i in range(t_min, t_max+1)]
+
+    
+    search_time = [[] for i in range(t_min, t_max+1)]
+    encode_time = []
+    verify_time = [[] for i in range(t_min, t_max+1)]
+
+
     for i in range(0, total_query_num, encode_batchsize):   
 
         end = i + encode_batchsize
@@ -594,12 +614,6 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
             end = total_query_num
 
 
-        for j in range(i, end):
-            if i + j >= total_query_num:
-                break
-            q = data_fetcher.get_test_graph_gid(i + j)
-            ground_truth[q] = sorted(ground_truth[q], 
-                                     key=lambda x: x[1]*10000000 + x[0])
  
 
 #        idx_list = list(range(i,end))
@@ -641,6 +655,11 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
 #            if i + j >= total_query_num:
 #                break
 
+            q = data_fetcher.get_test_graph_gid(i+j)
+            ground_truth[q] = sorted(ground_truth[q], 
+                                     key=lambda x: x[1]*10000000 + x[0])
+#            if q != 27764:
+#                continue
             tuple_code = tuple(code)
             
             cur_pos = 0
@@ -648,7 +667,7 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                     
                 start_time = time.time()
                 if use_emb:
-                        ret = subprocess.check_output(['./query',
+                    ret = subprocess.check_output(['./query',
                                                    str(tupleCode2IntegerCode(tuple_code)),
                                                    str(t + 1),
                                                    index_index_fname,
@@ -662,9 +681,9 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                 else:
                     ret = subprocess.check_output(['./query',
                                                    str(tupleCode2IntegerCode(tuple_code)),
-                                                   str(t),
-                                                   'SavedModel/inverted_index.index',
-                                                   'SavedModel/inverted_index.value',
+                                                   str(t+1),
+                                                   index_index_fname,
+                                                   index_value_fname,
                                                    str(len(inverted_index.keys())),
                                                    str(train_graph_num),
                                                    str(FLAGS.hash_code_len),
@@ -675,6 +694,55 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                     print('t={:d}, cost {:f} s'.format(t, time.time()-start_time))
                     
                 candidate_set = set([int(gid) for gid in ret.split()])
+
+
+                while cur_pos < len(ground_truth[q]) and\
+                        ground_truth[q][cur_pos][1] <= t:
+                    cur_pos = cur_pos + 1
+
+                real_sim_set_wrp = ground_truth[q][0:cur_pos]
+                real_sim_set = set([pair[0] for pair in real_sim_set_wrp])
+
+                ret_size_cdd[t-t_min].append(len(candidate_set))
+
+                tmp = candidate_set & real_sim_set
+                if len(candidate_set) == 0:
+                    if len(real_sim_set) == 0:
+                        precision = 1
+                    else:
+                        precision = 0
+                else:
+                    precision =  len(tmp)/len(candidate_set)
+
+                precisions_cdd[t-t_min].append(precision)
+                if len(real_sim_set) > 0:
+                    precisions_nz_cdd[t-t_min].append(precision)
+
+                if len(real_sim_set) == 0:
+                    if len(candidate_set) == 0:
+                        recall = 1
+                    else:
+                        recall = 0
+                else:
+                    recall = len(tmp)/len(real_sim_set)
+                recalls_cdd[t-t_min].append(recall)
+                if len(real_sim_set) > 0:
+                    recalls_nz_cdd[t-t_min].append(recall)
+
+                if precision * recall == 0:
+                    if len(real_sim_set) == 0 and len(candidate_set) == 0:
+                        f1_score = 1
+                    else:
+                        f1_score = 0
+                else:
+                    f1_score = 2*precision*recall/(precision+recall)
+
+                f1_scores_cdd[t-t_min].append(f1_score)
+                if len(real_sim_set) > 0:
+                    f1_scores_nz_cdd[t-t_min].append(f1_score)
+
+
+
 
                 start_time = time.time()
                 similar_set = rangeQueryVerification(i+j, candidate_set, 
@@ -687,13 +755,6 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
 
                 ret_size[t-t_min].append(len(similar_set))
 
-                q = data_fetcher.get_test_graph_gid(i+j)
-                while cur_pos < len(ground_truth[q]) and\
-                        ground_truth[q][cur_pos][1] <= t:
-                    cur_pos = cur_pos + 1
-
-                real_sim_set_wrp = ground_truth[q][0:cur_pos]
-                real_sim_set = set([pair[0] for pair in real_sim_set_wrp])
 
                 tmp = similar_set & real_sim_set
                 if len(similar_set) == 0:
@@ -703,19 +764,22 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                         precision = 0
                 else:
                     precision =  len(tmp)/len(similar_set)
+                """
                 if precision != 1:
                     if len(similar_set) > 0:
                         print(q)
+                        print('t=%d'%t)
                         print(similar_set)
-                        print(real_sim_set)
+                        print(real_sim_set_wrp)
+                        print(ground_truth[q][0:5])
                         raise RuntimeError('bug')
-
+                """
                 precisions[t-t_min].append(precision)
                 if len(real_sim_set) > 0:
                     precisions_nz[t-t_min].append(precision)
 
                 if len(real_sim_set) == 0:
-                    zero_cnt[t-t_min] = zero_cnt[t-1] + 1
+                    zero_cnt[t-t_min] = zero_cnt[t-t_min] + 1
                     if len(similar_set) == 0:
                         recall = 1
                     else:
@@ -743,6 +807,12 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
     for t in range(t_min, t_max+1):
         print('threshold = {:d}'.format(t), end=' ')
         print('empty cnt = {:d}'.format(zero_cnt[t-t_min]), end = ' ')
+
+        print('average cdd precision = %f'%(sum(precisions_cdd[t-t_min])/len(precisions_cdd[t-t_min])), end = ' ')
+        print('average cdd recall = %f'%(sum(recalls_cdd[t-t_min])/len(recalls_cdd[t-t_min])), end = ' ')
+        print('average cdd f1-score = %f'%(sum(f1_scores_cdd[t-t_min])/len(f1_scores_cdd[t-t_min])), end = ' ')
+        print('average cdd return size = %f'%(sum(ret_size_cdd[t-t_min])/len(ret_size_cdd[t-t_min])))
+ 
         print('average precision = %f'%(sum(precisions[t-t_min])/len(precisions[t-t_min])), end = ' ')
         print('average recall = %f'%(sum(recalls[t-t_min])/len(recalls[t-t_min])), end = ' ')
         print('average f1-score = %f'%(sum(f1_scores[t-t_min])/len(f1_scores[t-t_min])), end = ' ')
@@ -770,5 +840,24 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
         else:
             ave_f1_nz = float('nan')
         print('average f1-score = %f'%(ave_f1_nz))
+
+
+        if len(precisions_nz_cdd[t-t_min]) > 0:
+            ave_pre_nz = sum(precisions_nz_cdd[t-t_min])/len(precisions_nz_cdd[t-t_min])
+        else:
+            ave_pre_nz = float('nan')
+        print('average cdd precision = %f'%(ave_pre_nz), end = ' ')
+ 
+        if len(recalls_nz_cdd[t-t_min]) > 0:
+            ave_rc_nz = sum(recalls_nz_cdd[t-t_min])/len(recalls_nz_cdd[t-t_min])
+        else:
+            ave_rc_nz = float('nan') 
+        print('average cdd recall = %f'%(ave_rc_nz), end = ' ')
+
+        if len(f1_scores_nz_cdd[t-t_min]) > 0:
+            ave_f1_nz = sum(f1_scores_nz_cdd[t-t_min])/len(f1_scores_nz_cdd[t-t_min])
+        else:
+            ave_f1_nz = float('nan')
+        print('average cdd f1-score = %f'%(ave_f1_nz))
 
 

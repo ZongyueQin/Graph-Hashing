@@ -76,30 +76,33 @@ int BinarySearch(CodePos *array, int len, uint64_t code)
 	return -1;
 }
 
-void getTopKByEmb(int K, int graphCnt, GInfo *gInfo, deque<uint64_t>& gid)
+void getTopKByEmb(int K, int graphCnt, GInfo *gInfo, deque<uint64_t>& gid, int line)
 {
 	priority_queue<GInfo, vector<GInfo>, Comp> heap;
 	for(int i = 0; i < graphCnt; i++)
 	{
-		if (gInfo[i].gid == 0)
+/*		if (gInfo[i].gid == 0)
 		{
+			cout << "called at " << line << endl;
 			cout << graphCnt << endl;
 			cout << "gid = 0" << endl;
 			exit(0);
 		}
+*/
 		heap.push(gInfo[i]);
 		if (heap.size() > K)
 			heap.pop();
 	}	
 	while (!heap.empty())
 	{
-		if (heap.top().gid == 0)
+/*		if (heap.top().gid == 0)
 		{
+			cout << "called at " << line << endl;
 			cout << graphCnt << endl;
 			cout << "heap top gid = 0" << endl;
 			exit(0);
 
-		}
+		}*/
 		gid.push_front(heap.top().gid);
 		heap.pop();
 	}
@@ -202,13 +205,15 @@ int main(int argc, char **argv)
 		return -1;
 	}
 	close(fd2);
-	/*for(int i = 0; i < totalGraphCnt; i++)
+
+/*	for(int i = 0; i < totalGraphCnt; i++)
 		if (invertedIndexValue[i].gid == 0)
         	{
 			cout << "invertedIndexValue gid = 0" << endl;
-			return -1;
-		}   
-	cout << "nothing wrong" << endl;*/
+			exit(0);
+		}*/   
+
+
         int codeLen = atoi(argv[7]);
 	int embLen = atoi(argv[8]); 
 	GInfo qInfo;
@@ -240,10 +245,10 @@ int main(int argc, char **argv)
 			for(int j = start; j < end; j++)
 			{
 //				candidates[pos] = invertedIndexValue[j];
-				if (invertedIndexValue[j].gid == 0)
+/*				if (invertedIndexValue[j].gid == 0)
 				{
 					cout << "invertedIndex gid = 0" << endl;
-				}
+				}*/
 				candidates[pos].gid = invertedIndexValue[j].gid;
 				for(int dim = 0; dim < embLen; dim++)
 					candidates[pos].emb[dim] = invertedIndexValue[j].emb[dim];
@@ -252,11 +257,11 @@ int main(int argc, char **argv)
 			}
 		}
 		assert(ret == pos);
-		getTopKByEmb(K, ret, candidates, gids);
+		getTopKByEmb(K, ret, candidates, gids, __LINE__);
 	}
 	else
 	{
-		getTopKByEmb(K, totalGraphCnt, invertedIndexValue, gids);
+		getTopKByEmb(K, totalGraphCnt, invertedIndexValue, gids, __LINE__);
 	}
 
 	assert(gids.size() == K);
