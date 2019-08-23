@@ -4,12 +4,15 @@ from __future__ import division
 from __future__ import print_function
 import time
 import tensorflow as tf
-from random import randint, sample
+from random import randint, sample, seed
 import numpy as np
 import os
 import subprocess
 from tensorflow.python.tools import inspect_checkpoint as chkp
 import sys
+
+cur_folder = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, '{}/CSM'.format(cur_folder))
 
 # Below are modules implemented by our own
 from utils import *
@@ -18,10 +21,16 @@ import numpy as np
 from config import FLAGS
 from DataFetcher import DataFetcher
 import pickle
-from train import train_model
+from train import train_model, train_GH_CSM
 from query import computeTrainingMSE, computeTestMSEWithoutGroundTruth
 from query import computeTestMSEWithGroundTruth
 from query import topKQuery, rangeQuery
+from query import computeCSMTestMSEWithGroundTruth
+from query import rangeQueryCSM
+
+from CSM import CSM
+from saver import Saver as CSM_Saver
+from CSMDataFetcher import CSMDataFetcher
 
 """ environment configuration """
 os.environ['CUDA_VISIBLE_DEVICES']='4,5'
@@ -29,24 +38,29 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
 """ Specific which metrics to test """
-test_top_k = False
+test_top_k = True
 test_range_query = True
-train_mse = False
-test_mse = False
+train_mse = True
+test_mse = True
+test_csm_mse = True
+test_range_query_csm = True
 
 """ train the model or load existing model """
-train = False
+train = True
 model_path = "SavedModel/model_rank.ckpt"
 saved_files_dir = "SavedModel"
 
 """ Set random seed """
-seed = 123
-np.random.seed(seed)
-tf.set_random_seed(seed)
+random_seed = 123
+np.random.seed(random_seed)
+tf.set_random_seed(random_seed)
+seed(random_seed)
 
 
 """ Create data fetcher """
-data_fetcher = DataFetcher(dataset = FLAGS.dataset, exact_ged = True)
+
+#data_fetcher = DataFetcher(dataset = FLAGS.dataset, exact_ged = True)
+data_fetcher = DataFetcher(dataset=FLAGS.dataset, exact_ged=True)
 # wrap the data fetcher with tensorflow.dataset.prefetch to accelerate training
 dataset = tf.data.Dataset.from_generator(data_fetcher.get_train_data, 
                                          (tf.int64, tf.float32, tf.int64,
@@ -67,6 +81,7 @@ dataset = dataset.prefetch(buffer_size=1)
 iterator = dataset.make_one_shot_iterator()
 one_element = iterator.get_next()
 next_element = construct_input(one_element)
+csm_data_fetcher = CSMDataFetcher(dataset=FLAGS.dataset, exact_ged=True)
 
 
 # Define placeholders
@@ -89,18 +104,21 @@ model = GraphHash_Emb_Code(placeholders,
                            next_ele = next_element,
                            logging=True)
 
+csm = CSM(csm_data_fetcher)
 
 # Initialize session
 sess = tf.Session(config=config)
 
 # Init variables
 saver = tf.train.Saver()
-
+csm_saver = CSM_Saver(sess)
 cost_val = []
 
 if train:
-    train_model(sess, model, saver, placeholders, data_fetcher)
-
+    train_GH_CSM(sess, model, saver, placeholders, data_fetcher, 
+                 csm, csm_saver, csm_data_fetcher)
+#    train_model(sess, model, saver, placeholders, data_fetcher)
+#    csm.train(sess, csm_saver)
 else:
     saver.restore(sess, model_path)
     print("Model restored from", model_path)
@@ -159,6 +177,7 @@ if not has_GT:
                              placeholders)
 
 else:
+
     if test_mse == True:
         computeTestMSEWithGroundTruth(sess, model, thres, placeholders, 
                                       data_fetcher, ground_truth,
@@ -168,9 +187,25 @@ else:
         topKQuery(sess, model, data_fetcher, ground_truth,
               inverted_index,
               placeholders)
-        
+     
+    if test_csm_mse == True:
+        computeCSMTestMSEWithGroundTruth(sess, csm_saver, csm,
+                                         csm_data_fetcher, 
+                                         ground_truth)
+   
+    if test_range_query_csm:
+        rangeQueryCSM(sess, 
+                      csm,
+                      csm_data_fetcher,
+                      csm_saver,
+                      ground_truth,
+                      t_min = 1, t_max=6)
+
     if test_range_query == True:
         rangeQuery(sess, model, data_fetcher, ground_truth,
-              placeholders, inverted_index, t_min=1, t_max=9)
+              placeholders, inverted_index, 
+              csm=csm, csm_data_fetcher = csm_data_fetcher,
+              csm_saver = csm_saver,
+              t_min=1, t_max=6)
         
 

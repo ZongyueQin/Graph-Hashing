@@ -4,8 +4,8 @@ flags = tf.app.flags
 FLAGS = flags.FLAGS
 
 #dataset related
-flags.DEFINE_string('dataset', 'AIDS', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
-flags.DEFINE_string('ground_truth_file', 'GT11.txt', 'ground truth file, should be in test directory')
+flags.DEFINE_string('dataset', 'AIDS700nef', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
+flags.DEFINE_string('ground_truth_file', 'GT10.txt', 'ground truth file, should be in test directory')
 flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
 flags.DEFINE_string('node_feat_name','type','Name of node feature')
 flags.DEFINE_string('node_label_name', 'label', 'Name of node label, none if it\'s idx')
@@ -13,7 +13,7 @@ flags.DEFINE_boolean('clip', True, 'clip GED beyond GED_threshold')
 
 # data sample related
 flags.DEFINE_integer('k', 5, 'when training, we would generate k similar graphs for each one of sampled graphs')
-flags.DEFINE_integer('GED_threshold', 11, 'threshold within which 2 graphs are similar')
+flags.DEFINE_integer('GED_threshold', 10, 'threshold within which 2 graphs are similar')
 flags.DEFINE_integer('batchsize',10,'batch size for training')
 flags.DEFINE_string('label_type', 'ged', 'whether training label should be binary or ged')
 
@@ -30,7 +30,7 @@ flags.DEFINE_float('code_mse_w', 1, 'weight for code mse loss')
 flags.DEFINE_float('emb_mse_w', 10, 'weight for emb mse loss')
 
 # model structure related
-flags.DEFINE_string('model', 'gcn', 'Model string.')  # 'gcn', 'gcn_cheby', 'dense'
+#flags.DEFINE_string('model', 'gcn', 'Model string.')  # 'gcn', 'gcn_cheby', 'dense'
 flags.DEFINE_string('laplacian','gcn','how to compute laplacian')
 
 # layer related
@@ -50,7 +50,7 @@ flags.DEFINE_integer('hash_code_len',32,'length of hash code')
 flags.DEFINE_float('dropout', 0., 'Dropout rate (1 - keep probability).')
 flags.DEFINE_float('valid_percentage', 0, 'percentage of validation set')
 flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate.')
-flags.DEFINE_integer('epochs', 500, 'Number of epochs to train.')
+flags.DEFINE_integer('epochs', 15000, 'Number of epochs to train.')
 flags.DEFINE_integer('early_stopping', 50, 'Tolerance for early stopping (# of epochs).')
 flags.DEFINE_integer('last_n', 5, 'last n loss is used to decide early stopping or not')
 

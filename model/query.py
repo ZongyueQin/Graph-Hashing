@@ -8,6 +8,50 @@ import time
 import os
 from nx_to_gxl import nx_to_gxl
 
+def computeCSMTestMSEWithGroundTruth(sess, saver, csm,
+                                     csm_data_fetcher, 
+                                     ground_truth,
+                                     per_test_cnt = 10):
+    total_query_num = csm_data_fetcher.get_test_graphs_num()
+    MSE_test = 0
+    
+    for i in range(0, total_query_num):
+        g1 = csm_data_fetcher.test_graphs[i]
+        g_list1 = [g1]
+
+        q = csm_data_fetcher.get_test_graph_gid(i)
+
+        ground_truth[q] = sorted(ground_truth[q],
+                                key=lambda x: x[1]*10000000 + x[0])
+
+            # Second batch, the closest graphs
+        g_list2 = []
+        GT = []
+        thres_scores = []
+        for pair in ground_truth[q][0:per_test_cnt]:
+            true_ged = pair[1]
+            gid = pair[0]
+            g2 = csm_data_fetcher.getGraphByGid(gid)
+            g_list2.append(g2)
+            normalzied_ged = true_ged*2/(len(g1.nxgraph.nodes())+len(g2.nxgraph.nodes()))
+            thres = CSM_FLAGS.csm_GED_threshold*2/(len(g1.nxgraph.nodes())+len(g2.nxgraph.nodes()))
+            thres = np.exp(-thres)
+            score = np.exp(-normalzied_ged)
+            GT.append(score)
+            thres_scores.append(thres)
+            
+        pred = csm.predict(sess, saver, g_list1, g_list2)
+        GT = np.array(GT)
+        pred = np.squeeze(pred)
+        thres_scores = np.array(thres_scores)
+        
+        GT[GT == thres_scores] = 0
+            
+        MSE_test = MSE_test + (np.mean((GT-pred)**2))/total_query_num
+
+    print('MSE for test = {:f}'.format(MSE_test))
+
+
 def computeTrainingMSE(sess, model, thres, data_fetcher, placeholders,
                        pair_num=100, use_code=True, use_emb=True):
     # Compute MSE of estimated GED for training data
@@ -533,8 +577,29 @@ def BssGedVerification(q_idx, candidate_set, data_fetcher, upbound):
     os.remove(g_fname)
     return ret_set
     
-    
-def rangeQueryVerification(q_idx, candidate_set, data_fetcher, upbound):
+def CSMVerification(q_idx, candidate_set, csm_data_fetcher, upbound, csm, sess, csm_saver):
+    if len(candidate_set) == 0:
+        return set()
+    candidate_set = list(candidate_set)
+    g_graphs = [csm_data_fetcher.getGraphByGid(gid) for gid in candidate_set]
+    query_graph = csm_data_fetcher.test_graphs[q_idx]
+
+    scores = csm.predict(sess, csm_saver, [query_graph], g_graphs)
+    scores = np.resize(scores, (scores.size))
+
+    q_size = len(query_graph.nxgraph.nodes())
+    g_sizes = [len(g.nxgraph.nodes()) for g in g_graphs]
+    thres_scores = np.exp(-(np.array([(upbound+0.5)*2/(q_size+g_size) for g_size in g_sizes], dtype=np.float32)))
+
+    ret_set = set()
+    for i in range(len(candidate_set)):
+        if thres_scores[i] <= scores[i]:
+            ret_set.add(candidate_set[i])
+
+    return ret_set
+
+def rangeQueryVerification(q_idx, candidate_set, data_fetcher, upbound, 
+                           csm=None, csm_data_fetcher=None, sess = None, csm_saver=None):
     """ 
     if upbound > 3:
         return traditionalApproxVerification(q_idx, candidate_set, data_fetcher,
@@ -558,12 +623,18 @@ def rangeQueryVerification(q_idx, candidate_set, data_fetcher, upbound):
     return BssGedVerification(q_idx, candidate_set_small, data_fetcher, upbound) |\
     traditionalApproxVerification(q_idx, candidate_set_big, data_fetcher, upbound)
     """
-    return traditionalApproxVerification(q_idx, candidate_set, data_fetcher, upbound)
-    #return BssGedVerification(q_idx, candidate_set, data_fetcher, upbound)
+    #return traditionalApproxVerification(q_idx, candidate_set, data_fetcher, upbound)
+    if csm is None:
+      return BssGedVerification(q_idx, candidate_set, data_fetcher, upbound)
+    else:
+      return CSMVerification(q_idx, candidate_set, csm_data_fetcher, upbound, csm, sess, csm_saver)
 
 def rangeQuery(sess, model, data_fetcher, ground_truth,
               placeholders,
               inverted_index,
+              csm = None,
+              csm_data_fetcher = None,
+              csm_saver = None,
               t_min = 1, t_max=FLAGS.GED_threshold-2,
               index_index_fname='SavedModel/inverted_index.index',
               index_value_fname='SavedModel/inverted_index.value',
@@ -747,7 +818,11 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                 start_time = time.time()
                 similar_set = rangeQueryVerification(i+j, candidate_set, 
                                                      data_fetcher,
-                                                     upbound=t)                
+                                                     upbound=t,
+                                                     csm=csm,
+                                                     csm_data_fetcher=csm_data_fetcher,
+                                                     sess = sess,
+                                                     csm_saver=csm_saver)                
                 verify_time[t-t_min].append(time.time()-start_time)
 #                similar_set = set([int(gid) for gid in ret.split()])
                 if i + j == 0:
@@ -860,4 +935,135 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
             ave_f1_nz = float('nan')
         print('average cdd f1-score = %f'%(ave_f1_nz))
 
+def rangeQueryCSM(sess, 
+                  csm,
+                  csm_data_fetcher,
+                  csm_saver,
+                  ground_truth,
+                  t_min = 1, t_max=FLAGS.GED_threshold-2):
+
+
+    total_query_num = csm_data_fetcher.get_test_graphs_num()
+    train_graph_num = csm_data_fetcher.get_train_graphs_num()
+
+    precisions = [[] for i in range(t_min, t_max+1)]
+    recalls = [[] for i in range(t_min, t_max+1)]
+    f1_scores = [[] for i in range(t_min, t_max+1)]
+
+    precisions_nz = [[] for i in range(t_min, t_max+1)]
+    recalls_nz = [[] for i in range(t_min, t_max+1)]
+    f1_scores_nz = [[] for i in range(t_min, t_max+1)]
+
+    verify_time = [[] for i in range(t_min, t_max+1)]
+
+    for i in range(0, total_query_num):   
+
+        q = csm_data_fetcher.get_test_graph_gid(i)
+        ground_truth[q] = sorted(ground_truth[q], 
+                                     key=lambda x: x[1]*10000000 + x[0])
+#            if q != 27764:
+#                continue
+            
+        cur_pos = 0
+        for t in range(t_min,t_max+1):
+                    
+            while cur_pos < len(ground_truth[q]) and\
+                  ground_truth[q][cur_pos][1] <= t:
+                cur_pos = cur_pos + 1
+
+            real_sim_set_wrp = ground_truth[q][0:cur_pos]
+            real_sim_set = set([pair[0] for pair in real_sim_set_wrp])
+
+
+
+            start_time = time.time()
+
+            similar_set = CSMVerification(i, csm_data_fetcher.train_graphs, 
+                                          csm_data_fetcher, 
+                                          t, csm, sess, csm_saver)
+            verify_time[t-t_min].append(time.time()-start_time)
+#                similar_set = set([int(gid) for gid in ret.split()])
+            if i == 0:
+                print('verification time: {:f} s'.format(time.time()-start_time))
+
+            ret_size[t-t_min].append(len(similar_set))
+
+
+            tmp = similar_set & real_sim_set
+            if len(similar_set) == 0:
+                if len(real_sim_set) == 0:
+                    precision = 1
+                else:
+                    precision = 0
+            else:
+                precision =  len(tmp)/len(similar_set)
+            """
+                if precision != 1:
+                    if len(similar_set) > 0:
+                        print(q)
+                        print('t=%d'%t)
+                        print(similar_set)
+                        print(real_sim_set_wrp)
+                        print(ground_truth[q][0:5])
+                        raise RuntimeError('bug')
+            """
+            precisions[t-t_min].append(precision)
+            if len(real_sim_set) > 0:
+                precisions_nz[t-t_min].append(precision)
+
+            if len(real_sim_set) == 0:
+                zero_cnt[t-t_min] = zero_cnt[t-t_min] + 1
+                if len(similar_set) == 0:
+                    recall = 1
+                else:
+                    recall = 0
+            else:
+                recall = len(tmp)/len(real_sim_set)
+            recalls[t-t_min].append(recall)
+            if len(real_sim_set) > 0:
+                recalls_nz[t-t_min].append(recall)
+
+            if precision * recall == 0:
+                if len(real_sim_set) == 0 and len(similar_set) == 0:
+                    f1_score = 1
+                else:
+                    f1_score = 0
+            else:
+                f1_score = 2*precision*recall/(precision+recall)
+
+            f1_scores[t-t_min].append(f1_score)
+            if len(real_sim_set) > 0:
+                f1_scores_nz[t-t_min].append(f1_score)
+
+    print('For range query')
+    for t in range(t_min, t_max+1):
+        print('threshold = {:d}'.format(t), end=' ')
+        print('empty cnt = {:d}'.format(zero_cnt[t-t_min]), end = ' ')
+
+        print('average precision = %f'%(sum(precisions[t-t_min])/len(precisions[t-t_min])), end = ' ')
+        print('average recall = %f'%(sum(recalls[t-t_min])/len(recalls[t-t_min])), end = ' ')
+        print('average f1-score = %f'%(sum(f1_scores[t-t_min])/len(f1_scores[t-t_min])), end = ' ')
+        print('average return size = %f'%(sum(ret_size[t-t_min])/len(ret_size[t-t_min])), end = ' ')
+        print('average verify time = {:f}'.format(sum(verify_time[t-t_min])/len(verify_time[t-t_min])))
+
+    print('ignore empty answers')
+    for t in range(t_min,t_max+1):
+        print('threshold = {:d}'.format(t), end = ' ')
+        if len(precisions_nz[t-t_min]) > 0:
+            ave_pre_nz = sum(precisions_nz[t-t_min])/len(precisions_nz[t-t_min])
+        else:
+            ave_pre_nz = float('nan')
+        print('average precision = %f'%(ave_pre_nz), end = ' ')
+ 
+        if len(recalls_nz[t-t_min]) > 0:
+            ave_rc_nz = sum(recalls_nz[t-t_min])/len(recalls_nz[t-t_min])
+        else:
+            ave_rc_nz = float('nan') 
+        print('average recall = %f'%(ave_rc_nz), end = ' ')
+
+        if len(f1_scores_nz[t-t_min]) > 0:
+            ave_f1_nz = sum(f1_scores_nz[t-t_min])/len(f1_scores_nz[t-t_min])
+        else:
+            ave_f1_nz = float('nan')
+        print('average f1-score = %f'%(ave_f1_nz))
 
