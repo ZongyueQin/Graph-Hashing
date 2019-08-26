@@ -25,8 +25,11 @@ class SiameseRegressionModel_DF(CSM_Model):
             tf.float32, shape=(CSM_FLAGS.csm_batch_size, 1))
         self.val_test_y_true = tf.placeholder(
             tf.float32, shape=(1, 1))
+        self.y_lowbound = tf.placeholder(tf.float32, shape=(None, 1))
         # Build the model.
         super(SiameseRegressionModel_DF, self).__init__()
+        self.val_test_output = tf.maximum(self.val_test_output, self.y_lowbound)
+        self.train_outputs = tf.maximum(self.train_outputs, self.y_lowbound)
         #self.ds_kernel = create_ds_kernel(
         #    CSM_FLAGS.csm_ds_kernel, get_flags('yeta'), get_flags('scale'))
         #self.train_triples = self._load_train_triples(data, dist_sim_calculator)
@@ -41,6 +44,7 @@ class SiameseRegressionModel_DF(CSM_Model):
         rtn = {}
         pairs = []
         y_true = np.zeros((CSM_FLAGS.csm_batch_size, 1))
+        y_lowbound = np.zeros((CSM_FLAGS.csm_batch_size, 1))
         glabels = None
         if need_gc:
             glabels = np.zeros((CSM_FLAGS.csm_batch_size * 2, CSM_FLAGS.csm_num_glabels))
@@ -53,7 +57,7 @@ class SiameseRegressionModel_DF(CSM_Model):
                 glabels[i][g1.glabel_position] = 1
                 glabels[CSM_FLAGS.csm_batch_size + i][g2.glabel_position] = 1
         """
-        pair_list, true_sim_dist_list =\
+        pair_list, true_sim_dist_list, lowbound_list =\
             self.data_fetcher.samplePairListWithLabel(CSM_FLAGS.csm_real_pair_bs,
                                                       CSM_FLAGS.csm_batch_size-CSM_FLAGS.csm_real_pair_bs)
         for i, (pair, true_sim_dist) in enumerate(zip(pair_list, true_sim_dist_list)):
@@ -62,9 +66,11 @@ class SiameseRegressionModel_DF(CSM_Model):
 #            print(pair)
             pairs.append(pair)
             y_true[i] = true_sim_dist
+            y_lowbound[i] = lowbound_list[i]
             
         rtn[self.train_y_true] = y_true
         rtn[self.dropout] = CSM_FLAGS.csm_dropout
+        rtn[self.y_lowbound] = y_lowbound
         if need_gc:
             rtn[self.train_true_glabels] = glabels
         return self._supply_laplacians_etc_to_feed_dict(rtn, pairs, 'train')
@@ -74,7 +80,12 @@ class SiameseRegressionModel_DF(CSM_Model):
         pairs = [(g1, g2)]
         y_true = np.zeros((1, 1))
         y_true[0] = true_sim_dist
+
+        y_lowbound = np.zeros((1,1))
+        y_lowbound[0][0] = 2*CSM_FLAGS.csm_GED_threshold/(len(g1.nxgraph.nodes()) + len(g2.nxgraph.nodes()))
+
         rtn[self.val_test_y_true] = y_true
+        rtn[self.y_lowbound] = y_lowbound
         if need_gc:
             glabels = np.zeros((1 * 2, CSM_FLAGS.csm_num_glabels))
             glabels[0][g1.glabel_position] = 1

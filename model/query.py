@@ -1,5 +1,7 @@
 from random import randint
+import socket
 from config import FLAGS
+from CSM_config import CSM_FLAGS
 from utils import *
 import numpy as np
 from scipy.stats import spearmanr, kendalltau
@@ -341,7 +343,8 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
     KRCCs = []
     search_time = []
     encode_time = []
-    encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
+#    encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
+    encode_batchsize=1
 
     for i in range(0, total_query_num, encode_batchsize):   
 
@@ -414,8 +417,10 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
                                            str(FLAGS.hash_code_len),
                                            str(FLAGS.embedding_dim),
                                            str(FLAGS.top_k)] + [str(dim) for dim in emb])
-             
+            #ret = ret.split() 
             search_time.append(time.time()-start_time)
+            #search_time.append(float(ret[-1]))
+            #ret = ret[0:-1]
             if i + j == 0:
                 print('top {:d}, cost {:f} s'.format(FLAGS.top_k, time.time()-start_time))
                 # print(ret)
@@ -554,8 +559,72 @@ def traditionalApproxVerification(q_idx, candidate_set, data_fetcher, upbound):
     os.remove(query_xml)
     os.remove(qfname)
     return ret_set
+
+def BssGedServerVerification(q_idx, candidate_set, data_fetcher, upbound, port=12345):
+    if len(candidate_set) == 0:
+        return set(), 0
+
+    candidate_set = list(candidate_set)
+    start_time = time.time()
+    addr = ("127.0.0.1", port)
+    s = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+
+    query_graph = data_fetcher.test_graphs[q_idx]
+    #print(query_graph.nxgraph.graph['gid'])
+    print('python: %d %d'%(len(query_graph.nxgraph.nodes()), len(query_graph.nxgraph.edges())))
+    q_gid = str(query_graph.nxgraph.graph['gid'])
+    #q_fname = data_fetcher.writeGraph2TempFile(query_graph)
+#    g_fname = data_fetcher.writeGraphList2TempFile(candidate_set)
+    ret_set = set()
+
+#    geds = subprocess.check_output(['./ged', q_fname, '1', g_fname, 
+#                                   str(len(candidate_set)), 
+#                                   str(upbound),
+#                                   str(FLAGS.beam_width)])
+
+    EOS = False
+    s.sendto(bytes(q_gid, 'utf-8'), addr)
+    s.sendto(bytes(str(upbound),'utf-8'), addr)
+    for i in range(0, len(candidate_set), 1000):
+        start = i
+        end = min([i+1000, len(candidate_set)])
+        gid_send = ''
+
+        for gid in candidate_set[start:end]:
+            gid_send=gid_send+str(gid)+' '
+        if end - start < 1000:
+            gid_send = gid_send+'-1'
+            EOS = True
+
+        gid_send = bytes(gid_send, 'utf-8')
+        s.sendto(gid_send, addr)
+    if not EOS:
+        s.sendto(bytes('-1', 'utf-8'), addr)
+
+    geds = s.recvfrom(10000)
+    verify_time = time.time() - start_time
+    #verify_time = verify_time * 1000
+    geds = geds[0]
+    geds = geds.split()
+
+    
+#    verify_time = float(geds[-1])
+#    geds = geds[0:-1]
+    #print(geds)
+    assert(len(geds) == len(candidate_set))
+    for i, ged in enumerate(geds):
+
+        if int(ged) != -1:
+            ret_set.add(candidate_set[i])
+        #print(len(ret_set))
+            
+    #os.remove(q_fname)
+    #os.remove(g_fname)
+    return ret_set, verify_time
     
 def BssGedVerification(q_idx, candidate_set, data_fetcher, upbound):
+    if len(candidate_set) == 0:
+        return set(), 0
     candidate_set = list(candidate_set)
     query_graph = data_fetcher.test_graphs[q_idx]
     q_fname = data_fetcher.writeGraph2TempFile(query_graph)
@@ -567,7 +636,11 @@ def BssGedVerification(q_idx, candidate_set, data_fetcher, upbound):
                                    str(upbound),
                                    str(FLAGS.beam_width)])
         
-    for i, ged in enumerate(geds.split()):
+    geds = geds.split()
+    verify_time = float(geds[-1])
+    geds = geds[0:-1]
+    #print(geds)
+    for i, ged in enumerate(geds):
 
         if int(ged) != -1:
             ret_set.add(candidate_set[i])
@@ -575,7 +648,7 @@ def BssGedVerification(q_idx, candidate_set, data_fetcher, upbound):
             
     os.remove(q_fname)
     os.remove(g_fname)
-    return ret_set
+    return ret_set, verify_time
     
 def CSMVerification(q_idx, candidate_set, csm_data_fetcher, upbound, csm, sess, csm_saver):
     if len(candidate_set) == 0:
@@ -625,7 +698,7 @@ def rangeQueryVerification(q_idx, candidate_set, data_fetcher, upbound,
     """
     #return traditionalApproxVerification(q_idx, candidate_set, data_fetcher, upbound)
     if csm is None:
-      return BssGedVerification(q_idx, candidate_set, data_fetcher, upbound)
+      return BssGedServerVerification(q_idx, candidate_set, data_fetcher, upbound)
     else:
       return CSMVerification(q_idx, candidate_set, csm_data_fetcher, upbound, csm, sess, csm_saver)
 
@@ -636,15 +709,16 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
               csm_data_fetcher = None,
               csm_saver = None,
               t_min = 1, t_max=FLAGS.GED_threshold-2,
-              index_index_fname='SavedModel/inverted_index.index',
-              index_value_fname='SavedModel/inverted_index.value',
+              index_index_fname='SavedModel/inverted_index_'+FLAGS.dataset+'.index',
+              index_value_fname='SavedModel/inverted_index_'+FLAGS.dataset+'.value',
               #input_batchsize = 1,
               use_code=True, use_emb=True):
     thres = np.zeros(FLAGS.hash_code_len)
 
     total_query_num = data_fetcher.get_test_graphs_num()
     train_graph_num = data_fetcher.get_train_graphs_num()
-    encode_batchsize=(1+FLAGS.k) * FLAGS.batchsize    
+    #encode_batchsize=(1+FLAGS.k) * FLAGS.batchsize    
+    encode_batchsize = 1
 
     precisions = [[] for i in range(t_min, t_max+1)]
     recalls = [[] for i in range(t_min, t_max+1)]
@@ -760,7 +834,10 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                                                    str(FLAGS.hash_code_len),
                                                    str(FLAGS.embedding_dim),
                                                    '-1'])
+#                ret = ret.split()
                 search_time[t-t_min].append(time.time()-start_time)
+#                search_time[t-t_min].append(float(ret[-1]))
+#                ret = ret[0:-1]
                 if i + j == 0:
                     print('t={:d}, cost {:f} s'.format(t, time.time()-start_time))
                     
@@ -788,6 +865,9 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                 precisions_cdd[t-t_min].append(precision)
                 if len(real_sim_set) > 0:
                     precisions_nz_cdd[t-t_min].append(precision)
+                    print(real_sim_set)
+                    print(candidate_set)
+                 
 
                 if len(real_sim_set) == 0:
                     if len(candidate_set) == 0:
@@ -811,22 +891,24 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                 f1_scores_cdd[t-t_min].append(f1_score)
                 if len(real_sim_set) > 0:
                     f1_scores_nz_cdd[t-t_min].append(f1_score)
-
+                   
 
 
 
                 start_time = time.time()
-                similar_set = rangeQueryVerification(i+j, candidate_set, 
+                similar_set, verify_t = rangeQueryVerification(i+j, candidate_set, 
                                                      data_fetcher,
                                                      upbound=t,
                                                      csm=csm,
                                                      csm_data_fetcher=csm_data_fetcher,
                                                      sess = sess,
                                                      csm_saver=csm_saver)                
-                verify_time[t-t_min].append(time.time()-start_time)
+#                verify_time[t-t_min].append(verify_t)
+                verify_time[t-t_min].append(verify_t)
 #                similar_set = set([int(gid) for gid in ret.split()])
                 if i + j == 0:
-                    print('verification time: {:f} s'.format(time.time()-start_time))
+                    print('verification time: {:f} s'.format(verify_t))
+
 
                 ret_size[t-t_min].append(len(similar_set))
 
@@ -839,7 +921,7 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                         precision = 0
                 else:
                     precision =  len(tmp)/len(similar_set)
-                """
+                
                 if precision != 1:
                     if len(similar_set) > 0:
                         print(q)
@@ -848,9 +930,10 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                         print(real_sim_set_wrp)
                         print(ground_truth[q][0:5])
                         raise RuntimeError('bug')
-                """
+                
                 precisions[t-t_min].append(precision)
                 if len(real_sim_set) > 0:
+                    print(similar_set)
                     precisions_nz[t-t_min].append(precision)
 
                 if len(real_sim_set) == 0:
@@ -891,7 +974,7 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
         print('average precision = %f'%(sum(precisions[t-t_min])/len(precisions[t-t_min])), end = ' ')
         print('average recall = %f'%(sum(recalls[t-t_min])/len(recalls[t-t_min])), end = ' ')
         print('average f1-score = %f'%(sum(f1_scores[t-t_min])/len(f1_scores[t-t_min])), end = ' ')
-        print('average return size = %f'%(sum(ret_size[t-t_min])/len(ret_size[t-t_min])), end = ' ')
+#        print('average return size = %f'%(sum(ret_size[t-t_min])/len(ret_size[t-t_min])), end = ' ')
         print('average search time = {:f}'.format(sum(search_time[t-t_min])/len(search_time[t-t_min])), end= ' ')
         print('average verify time = {:f}'.format(sum(verify_time[t-t_min])/len(verify_time[t-t_min])))
 
@@ -950,6 +1033,8 @@ def rangeQueryCSM(sess,
     recalls = [[] for i in range(t_min, t_max+1)]
     f1_scores = [[] for i in range(t_min, t_max+1)]
 
+    ret_size = [[] for i in range(t_min, t_max+1)]
+
     precisions_nz = [[] for i in range(t_min, t_max+1)]
     recalls_nz = [[] for i in range(t_min, t_max+1)]
     f1_scores_nz = [[] for i in range(t_min, t_max+1)]
@@ -978,7 +1063,7 @@ def rangeQueryCSM(sess,
 
             start_time = time.time()
 
-            similar_set = CSMVerification(i, csm_data_fetcher.train_graphs, 
+            similar_set = CSMVerification(i, list(csm_data_fetcher.gid2graph.keys()), 
                                           csm_data_fetcher, 
                                           t, csm, sess, csm_saver)
             verify_time[t-t_min].append(time.time()-start_time)
@@ -1012,7 +1097,7 @@ def rangeQueryCSM(sess,
                 precisions_nz[t-t_min].append(precision)
 
             if len(real_sim_set) == 0:
-                zero_cnt[t-t_min] = zero_cnt[t-t_min] + 1
+                #zero_cnt[t-t_min] = zero_cnt[t-t_min] + 1
                 if len(similar_set) == 0:
                     recall = 1
                 else:
@@ -1038,7 +1123,6 @@ def rangeQueryCSM(sess,
     print('For range query')
     for t in range(t_min, t_max+1):
         print('threshold = {:d}'.format(t), end=' ')
-        print('empty cnt = {:d}'.format(zero_cnt[t-t_min]), end = ' ')
 
         print('average precision = %f'%(sum(precisions[t-t_min])/len(precisions[t-t_min])), end = ' ')
         print('average recall = %f'%(sum(recalls[t-t_min])/len(recalls[t-t_min])), end = ' ')

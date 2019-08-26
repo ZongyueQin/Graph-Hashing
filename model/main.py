@@ -33,21 +33,22 @@ from saver import Saver as CSM_Saver
 from CSMDataFetcher import CSMDataFetcher
 
 """ environment configuration """
-os.environ['CUDA_VISIBLE_DEVICES']='4,5'
+os.environ['CUDA_VISIBLE_DEVICES']='0,1'
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
 """ Specific which metrics to test """
-test_top_k = True
+use_csm = False
+test_top_k = False
 test_range_query = True
-train_mse = True
-test_mse = True
-test_csm_mse = True
-test_range_query_csm = True
+train_mse = False
+test_mse = False
+test_csm_mse = False
+test_range_query_csm = False
 
 """ train the model or load existing model """
-train = True
-model_path = "SavedModel/model_rank.ckpt"
+train = False
+model_path = "SavedModel/model_"+FLAGS.dataset+".ckpt"
 saved_files_dir = "SavedModel"
 
 """ Set random seed """
@@ -81,7 +82,8 @@ dataset = dataset.prefetch(buffer_size=1)
 iterator = dataset.make_one_shot_iterator()
 one_element = iterator.get_next()
 next_element = construct_input(one_element)
-csm_data_fetcher = CSMDataFetcher(dataset=FLAGS.dataset, exact_ged=True)
+if use_csm:
+    csm_data_fetcher = CSMDataFetcher(dataset=FLAGS.dataset, exact_ged=True)
 
 
 # Define placeholders
@@ -90,7 +92,7 @@ placeholders = {
     'features': tf.sparse_placeholder(tf.float32, shape=(None, data_fetcher.get_node_feature_dim())),
     'labels': tf.placeholder(tf.float32, shape=(FLAGS.batchsize, FLAGS.batchsize)),
     'dropout': tf.placeholder_with_default(0., shape=()),
-    'graph_sizes': tf.placeholder(tf.int32, shape=((1+FLAGS.k)*FLAGS.batchsize)),
+    'graph_sizes': tf.placeholder(tf.int32, shape=(1)),
 #    'graph_sizes': tf.placeholder(tf.int32, shape=(None)),
     'generated_labels':tf.placeholder(tf.float32, shape=(FLAGS.batchsize, FLAGS.k)),
     'thres':tf.placeholder(tf.float32, shape=(FLAGS.hash_code_len))
@@ -104,20 +106,26 @@ model = GraphHash_Emb_Code(placeholders,
                            next_ele = next_element,
                            logging=True)
 
-csm = CSM(csm_data_fetcher)
+if use_csm:
+    csm = CSM(csm_data_fetcher)
 
 # Initialize session
 sess = tf.Session(config=config)
 
 # Init variables
 saver = tf.train.Saver()
-csm_saver = CSM_Saver(sess)
+
+if use_csm:
+    csm_saver = CSM_Saver(sess)
+
 cost_val = []
 
 if train:
-    train_GH_CSM(sess, model, saver, placeholders, data_fetcher, 
-                 csm, csm_saver, csm_data_fetcher)
-#    train_model(sess, model, saver, placeholders, data_fetcher)
+    if use_csm:
+        train_GH_CSM(sess, model, saver, placeholders, data_fetcher, 
+                     csm, csm_saver, csm_data_fetcher)
+    else:
+        train_model(sess, model, saver, placeholders, data_fetcher, save_path=model_path)
 #    csm.train(sess, csm_saver)
 else:
     saver.restore(sess, model_path)
@@ -131,15 +139,15 @@ inverted_index, id2emb, id2code = encodeTrainingData(sess, model,
 index_file = open('SavedModel/inverted_index_rank.pkl', 'wb')
 pickle.dump(inverted_index, index_file)
 index_file.close()
-writeInvertedIndex(os.path.join(saved_files_dir, 'inverted_index.txt'),
+writeInvertedIndex(os.path.join(saved_files_dir, 'inverted_index_'+FLAGS.dataset+'.txt'),
                    inverted_index, 
                    FLAGS.embedding_dim)
 # turn inverted index into format that can be processed by query.cpp or 
 # topKQuery.cpp 
 subprocess.check_output(['./processInvertedIndex', 
-                        os.path.join(saved_files_dir, 'inverted_index.txt'),
-                        os.path.join(saved_files_dir, 'inverted_index.index'), 
-                        os.path.join(saved_files_dir, 'inverted_index.value')])
+                        os.path.join(saved_files_dir, 'inverted_index_'+FLAGS.dataset+'.txt'),
+                        os.path.join(saved_files_dir, 'inverted_index_'+FLAGS.dataset+'.index'), 
+                        os.path.join(saved_files_dir, 'inverted_index_'+FLAGS.dataset+'.value')])
 
 print('Saved index to ', 
       os.path.join(saved_files_dir, 'inverted_index_rank.pkl'))
@@ -202,7 +210,13 @@ else:
                       t_min = 1, t_max=6)
 
     if test_range_query == True:
-        rangeQuery(sess, model, data_fetcher, ground_truth,
+        if not use_csm:
+            rangeQuery(sess, model, data_fetcher, ground_truth,
+              placeholders, inverted_index, 
+              t_min=1, t_max=1)
+
+        else:
+            rangeQuery(sess, model, data_fetcher, ground_truth,
               placeholders, inverted_index, 
               csm=csm, csm_data_fetcher = csm_data_fetcher,
               csm_saver = csm_saver,

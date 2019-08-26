@@ -16,6 +16,7 @@ import itertools
 import time
 import subprocess
 import tensorflow as tf
+import xml
 
 from nx_to_gxl import nx_to_gxl
 from config import FLAGS
@@ -25,9 +26,10 @@ class DataFetcher:
     """ Represents a set of data """
     
     """ read training graphs and test graphs """
-    def __init__(self, dataset, exact_ged = False):
+    def __init__(self, dataset, exact_ged = False, label_transform = lambda x: x):
         
         self.exact_ged = exact_ged
+        self.label_transform = label_transform
         # a helper object to map features to consecutive integer
         self.type_hash={}
         self.typeCnt = 0
@@ -149,6 +151,9 @@ class DataFetcher:
         # get size of each graph
         sizes = [g.nxgraph.number_of_nodes() for g in self.sample_graphs]         
         
+        self.labels = self.label_transform(self.labels)
+        generated_labels = self.label_transform(generated_labels)
+
         return features, laplacians, sizes, self.labels, generated_labels
         
     """ sample train_graphs and compute label between each pair of graphs """
@@ -188,11 +193,12 @@ class DataFetcher:
             fname = self.writeSampledGraphList2TempFile()
             g_cnt = str(len(self.sample_graphs))
             ret = subprocess.check_output(['./ged', fname, g_cnt, fname, g_cnt, 
-                                       str(FLAGS.GED_threshold),
+                                       str(FLAGS.GED_threshold - 1),
                                        str(FLAGS.beam_width)])
 
-            geds = [int(ged) for ged in ret.split()]
+            geds = [float(ged) for ged in ret.split()][0:-1]
             geds = np.array(geds)
+            geds[geds==-1] = FLAGS.GED_threshold
             self.labels = np.resize(geds, (batchsize, batchsize))
 
 
@@ -242,18 +248,25 @@ class DataFetcher:
     """ read *.gexf in graph_dir and return a list of networkx graph """
     def _readGraphs(self, graph_dir):
         graphs = []
+        err_cnt = 0
         for file in sorted_nicely(glob(graph_dir+'/*.gexf')):
             if len(graphs) % 1000 == 0:
                 print('finished {:d} files'.format(len(graphs)))
             gid = int(os.path.basename(file).split('.')[0])
-            g = nx.read_gexf(file)
+            try:
+                g = nx.read_gexf(file)
+            except xml.etree.ElementTree.ParseError:
+                print('err in nx.read_fexf', end = ' ')
+                print(file)
+                err_cnt = err_cnt + 1
+                continue
             g.graph['gid'] = gid
             graphs.append(g)
 #            if len(graphs) == FLAGS.batchsize*(1+FLAGS.k):
 #                break
 #            if not nx.is_connected(g):
 #                print('{} not connected'.format(gid))
-                
+        print('%d error occured'%err_cnt)
         return graphs
     
     """ split train_graphs into training set and validation set """
@@ -386,6 +399,7 @@ class DataFetcher:
         ged = subprocess.check_output(['./ged', g1_fname, '1', g2_fname, '1', 
                                        str(FLAGS.GED_threshold),
                                        str(FLAGS.beam_width)])
+        ged = ged.split()[0]
         # remove temporary files
         os.remove(g1_fname)
         os.remove(g2_fname)
@@ -424,12 +438,16 @@ class DataFetcher:
             label2node = {}
         
             for i,n in enumerate(nxgraph.nodes(data=True)):
-                if n[1][self.node_feat_name] not in self.type_hash.keys():
-                    self.type_hash[n[1][self.node_feat_name]] = self.typeCnt
-                    self.typeCnt = self.typeCnt + 1
-                if self.node_label_name != 'none':
+                if self.node_feat_name is None:
                     label2node[n[1][self.node_label_name]] = i
-                f.write(str(self.type_hash[n[1][self.node_feat_name]])+'\n')
+                    f.write('1\n')
+                else:
+                    if n[1][self.node_feat_name] not in self.type_hash.keys():
+                        self.type_hash[n[1][self.node_feat_name]] = self.typeCnt
+                        self.typeCnt = self.typeCnt + 1
+                    if self.node_label_name != 'none':
+                        label2node[n[1][self.node_label_name]] = i
+                    f.write(str(self.type_hash[n[1][self.node_feat_name]])+'\n')
         
             for e in nxgraph.edges():
                 if self.node_label_name == 'none':
@@ -456,12 +474,16 @@ class DataFetcher:
             label2node = {}
         
             for i,n in enumerate(nxgraph.nodes(data=True)):
-                if n[1][self.node_feat_name] not in self.type_hash.keys():
-                    self.type_hash[n[1][self.node_feat_name]] = self.typeCnt
-                    self.typeCnt = self.typeCnt + 1
-                if self.node_label_name != 'none':
+                if self.node_feat_name is None:
                     label2node[n[1][self.node_label_name]] = i
-                f.write(str(self.type_hash[n[1][self.node_feat_name]])+'\n')
+                    f.write('1\n')
+                else:
+                    if n[1][self.node_feat_name] not in self.type_hash.keys():
+                        self.type_hash[n[1][self.node_feat_name]] = self.typeCnt
+                        self.typeCnt = self.typeCnt + 1
+                    if self.node_label_name != 'none':
+                        label2node[n[1][self.node_label_name]] = i
+                    f.write(str(self.type_hash[n[1][self.node_feat_name]])+'\n')
         
             for e in nxgraph.edges():
                 if self.node_label_name == 'none':
@@ -484,12 +506,16 @@ class DataFetcher:
         label2node = {}
         
         for i,n in enumerate(nxgraph.nodes(data=True)):
-            if n[1][self.node_feat_name] not in self.type_hash.keys():
-                self.type_hash[n[1][self.node_feat_name]] = self.typeCnt
-                self.typeCnt = self.typeCnt + 1
-            if self.node_label_name != 'none':
+            if self.node_feat_name is None:
                 label2node[n[1][self.node_label_name]] = i
-            f.write(str(self.type_hash[n[1][self.node_feat_name]])+'\n')
+                f.write('1\n')
+            else:
+                if n[1][self.node_feat_name] not in self.type_hash.keys():
+                    self.type_hash[n[1][self.node_feat_name]] = self.typeCnt
+                    self.typeCnt = self.typeCnt + 1
+                if self.node_label_name != 'none':
+                    label2node[n[1][self.node_label_name]] = i
+                f.write(str(self.type_hash[n[1][self.node_feat_name]])+'\n')
         
         for e in nxgraph.edges():
             if self.node_label_name == 'none':
@@ -514,7 +540,7 @@ class DataFetcher:
         for i in range(k):
             tmp_g = g.nxgraph.copy()
             # sample how many edit operation to perform
-            op_num = randint(1,FLAGS.GED_threshold-2)
+            op_num = randint(1,6)#FLAGS.GED_threshold-2)
             # though not accurate, may be good enough
             geds.append(op_num)
             j = 0
@@ -531,7 +557,7 @@ class DataFetcher:
                 
                 op = randint(0, 4)
                 while (can_delete_node is False and op == 4) or\
-                (op == 0 and self.node_feat_type == 'constant') or\
+                (op == 0 and 'constant' in self.node_feat_type) or\
                 (op >= 3 and j == op_num - 1) or\
                 (op_cannot_be_1 and op == 1) or\
                 (op_cannot_be_2 and op == 2):

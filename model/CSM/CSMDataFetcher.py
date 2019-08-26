@@ -71,8 +71,10 @@ class CSMDataFetcher:
         
         pairs = []
         true_dist_sims = []
+        lowbound_list = []
         i = 0
         j = 0
+
         for p in range(real_pair_batchsize):
             g1 = self.sample_graphs[i]
             g2 = self.sample_graphs[j]
@@ -80,7 +82,7 @@ class CSMDataFetcher:
             
             if transform:
                 ged = self.labels[i,j]
-                if ged < CSM_FLAGS.csm_GED_threshold:
+                if ged < CSM_FLAGS.csm_GED_threshold or CSM_FLAGS.csm_GED_threshold == -1:
                     normalized_ged = ged * 2 / (len(g1.nxgraph.nodes())+len(g2.nxgraph.nodes()))
                     score = np.exp(-normalized_ged)
                 else:
@@ -88,6 +90,14 @@ class CSMDataFetcher:
             else:
                 score = self.labels[i,j]
             true_dist_sims.append(score)
+
+            if CSM_FLAGS.csm_GED_threshold > 0:
+                GED_upbound = 2*CSM_FLAGS.csm_GED_threshold / (len(g1.nxgraph.nodes())+len(g2.nxgraph.nodes()))
+                lowbound = np.exp(-GED_upbound)
+                lowbound_list.append(lowbound)
+            else:
+                lowbound_list.append(0)
+
             j = j + 1
             if j == batchsize:
                 j = 0
@@ -123,10 +133,18 @@ class CSMDataFetcher:
                     else:
                         score = lab
                     true_dist_sims.append(score)
+
+                    if CSM_FLAGS.csm_GED_threshold > 0:    
+                        GED_upbound = 2*CSM_FLAGS.csm_GED_threshold / (len(g1.nxgraph.nodes())+len(g2.nxgraph.nodes()))
+                        lowbound = np.exp(-GED_upbound)
+                        lowbound_list.append(lowbound)
+                    else:
+                        lowbound_list.append(0)
+
                 p = p + 1
             
-                
-        return pairs, true_dist_sims
+#        print(true_dist_sims)        
+        return pairs, true_dist_sims, lowbound_list
 
     def getNextTrainPair(self, transform=True):
         g1 = self.train_graphs[self.cur_train_sample_ptr]
@@ -271,16 +289,21 @@ class CSMDataFetcher:
             """
             fname = self.writeSampledGraphList2TempFile()
             g_cnt = str(len(self.sample_graphs))
+            if CSM_FLAGS.csm_GED_threshold == -1:
+                upbound = "-1"
+            else:
+                upbound = str(CSM_FLAGS.csm_GED_threshold - 1)
             ret = subprocess.check_output(['./ged', fname, g_cnt, fname, g_cnt, 
-                    #                   "-1",
-                                       str(CSM_FLAGS.csm_GED_threshold),
+                  #                     "-1",
+                                       upbound,
                                        str(CSM_FLAGS.csm_beam_width)])
 
             geds = [int(ged) for ged in ret.split()]
             geds = np.array(geds)
-            geds[geds == -1] = CSM_FLAGS.csm_GED_threshold
-           # print('geds')
-           # print(geds)
+            if CSM_FLAGS.csm_GED_threshold != -1:
+                geds[geds == -1] = CSM_FLAGS.csm_GED_threshold
+            #print('geds')
+            #print(geds)
             self.labels = np.resize(geds, (batchsize, batchsize))
 
         return
@@ -407,16 +430,20 @@ class CSMDataFetcher:
 
         return sparse_mx
 
-    def getApproxGEDForEachPair(self, graphs):
+    def getApproxGEDForEachPair(self, graphs_1, graphs_2=None):
 
-        n = len(graphs)
-        geds = np.zeros((n,n))
-        collection_file = os.path.join('tmpfile',
+        n = len(graphs_1)
+        if graphs_2 is None:
+            m = n
+        else:
+            m = len(graph_2)
+        geds = np.zeros((n,m))
+        collection_file_1 = os.path.join('tmpfile',
                                         str(time.time())+'.xml')
-        f = open(collection_file, 'w')
+        f = open(collection_file_1, 'w')
         f.write('<?xml version="1.0"?>\n<GraphCollection>\n<graphs>\n')        
         fnames = []
-        for g in graphs:
+        for g in graphs_1:
             fname = os.path.join('tmpfile',
                                  str(time.time())+\
                                  str(g.nxgraph.graph['gid'])+'.gxl')
@@ -427,40 +454,88 @@ class CSMDataFetcher:
             
         f.write('</graphs>\n</GraphCollection>')
         f.close()
+
+
+        if graphs_2 is None:
+            collection_file_2 = collection_file_1
+        else:
+            collection_file_2 = os.path.join('tmpfile',
+                                        str(time.time())+'.xml')
+            f = open(collection_file_2, 'w')
+            f.write('<?xml version="1.0"?>\n<GraphCollection>\n<graphs>\n')        
+            
+            for g in graphs_2:
+                fname = os.path.join('tmpfile',
+                                     str(time.time())+\
+                                     str(g.nxgraph.graph['gid'])+'.gxl')
+
+                nx_to_gxl(g.nxgraph, g.nxgraph.graph['gid'], fname)
+                f.write('<print file="{}"/>\n'.format(fname))
+                fnames.append(fname)     
+            
+            f.write('</graphs>\n</GraphCollection>')
+            f.close()
+
+
+
         ged_1 = subprocess.check_output(['java', '-cp', 
                                          'graph-matching-toolkit/src',
-                                         'algorithms.graphmatching',
-                                         self.data_dir+'/prop/vj.prop',
-                                         collection_file, 
-                                         collection_file])
+                                         'algorithms.GraphMatching',
+                                         self.data_dir+'/prop/VJ.prop',
+                                         collection_file_1, 
+                                         collection_file_2])
     
         ged_2 = subprocess.check_output(['java', '-cp', 
                                          'graph-matching-toolkit/src',
-                                         'algorithms.graphmatching',
+                                         'algorithms.GraphMatching',
                                          self.data_dir+'/prop/beam.prop',
-                                         collection_file, 
-                                         collection_file])
+                                         collection_file_1, 
+                                         collection_file_2])
     
         ged_3 = subprocess.check_output(['java', '-cp', 
                                          'graph-matching-toolkit/src',
-                                         'algorithms.graphmatching',
+                                         'algorithms.GraphMatching',
                                          self.data_dir+'/prop/hungarian.prop',
-                                         collection_file, 
-                                         collection_file])
+                                         collection_file_1, 
+                                         collection_file_2])
   
         ged_1_list = ged_1.split()
         ged_2_list = ged_2.split()
         ged_3_list = ged_3.split()
-        for i in range(n):
-            for j in range(i + 1, n, 1):
-                ged = min([float(ged_1_list[i*n+j]), float(ged_1_list[j*n+i]),
-                           float(ged_2_list[i*n+j]), float(ged_2_list[j*n+i]),
-                           float(ged_3_list[i*n+j]), float(ged_3_list[j*n+i]),
-                           flags.ged_threshold])
-                geds[i,j] = ged    
-                geds[j,i] = ged
-    
-        os.remove(collection_file)
+
+#        print(ged_1)
+#        print(ged_2)
+#        print(ged_3)
+        assert(len(ged_1_list) == n*m)
+        assert(len(ged_2_list) == n*m)
+        assert(len(ged_3_list) == n*m)
+     
+        if graphs_2 is None:
+            for i in range(n):
+                for j in range(i + 1, n, 1):
+                    ged = min([float(ged_1_list[i*n+j]), float(ged_1_list[j*n+i]),
+                               float(ged_2_list[i*n+j]), float(ged_2_list[j*n+i]),
+                               float(ged_3_list[i*n+j]), float(ged_3_list[j*n+i])])
+                    if CSM_FLAGS.csm_GED_threshold > 0:
+                        ged = min([ged, CSM_FLAGS.csm_GED_threshold])
+
+                    geds[i,j] = ged    
+                    geds[j,i] = ged
+        else:        
+             for i in range(n):
+                for j in range(m):
+                    ged = min([float(ged_1_list[i*n+j]),
+                               float(ged_2_list[i*n+j]),
+                               float(ged_3_list[i*n+j])])
+                    if CSM_FLAGS.csm_GED_threshold > 0:
+                        ged = min([ged, CSM_FLAGS.csm_GED_threshold])
+
+                    geds[i,j] = ged    
+
+        os.remove(collection_file_1)
+        if graphs_2 is not None:
+            os.remove(collection_file_2)
+
         for fname in fnames:
             os.remove(fname)
         
@@ -571,7 +646,7 @@ class CSMDataFetcher:
         for i in range(k):
             tmp_g = g.nxgraph.copy()
             # sample how many edit operation to perform
-            op_num = randint(1,CSM_FLAGS.csm_GED_threshold-2)
+            op_num = randint(1,6)
             # though not accurate, may be good enough
             geds.append(op_num)
             j = 0

@@ -3,21 +3,21 @@ import tensorflow as tf
 # Hyper-parameters.
 flags = tf.app.flags
 
-flags.DEFINE_string('csm_ground_truth_file', 'GT10.txt', '')
+flags.DEFINE_string('csm_ground_truth_file', 'GT11.txt', '')
 flags.DEFINE_string('csm_laplacian', 'gcn', '')
-flags.DEFINE_integer('csm_GED_threshold', 10, 'upper bound for GED')
+flags.DEFINE_integer('csm_GED_threshold', -1, 'upper bound for GED')
 flags.DEFINE_string('csm_special_note', 'scale exp', 'Special note.')
 flags.DEFINE_string('csm_node_label_name', 'label', 'Name of node label, none if it\'s idx')
-flags.DEFINE_integer('csm_real_pair_bs', 144, 'How many pairs in training is really sampled')
+flags.DEFINE_integer('csm_real_pair_bs', 128, 'How many pairs in training is really sampled')
 flags.DEFINE_integer('csm_beam_width', 15, 'beam width for BSS-GED')
 # For data preprocessing.
 """ dataset: aids80nef, aids700nef, linux, imdbmulti, alkane, nasa, nci109, 
              webeasy, ptc, reddit10k, collab, mutag, linux_imdb. """
-dataset = 'aids700nef'
+dataset = 'aids'
 dataset_train = dataset
 dataset_val_test = dataset
 dataset_super_large = False
-flags.DEFINE_string('csm_dataset', 'AIDS700nef', 'dataset')
+flags.DEFINE_string('csm_dataset', 'AIDS', 'dataset')
 if 'aids' in dataset or dataset in ['alkane', 'webeasy', 'nci109', 'ptc', 'mutag']:
     node_feat_name = 'type'
     node_feat_encoder = 'onehot'
@@ -36,7 +36,7 @@ if 'aids' in dataset or dataset in ['alkane', 'webeasy', 'nci109', 'ptc', 'mutag
     if dataset == 'aids80nef':
         num_glabels = 10
         # dataset_super_large = True
-elif dataset in ['linux', 'nasa', 'reddit10k', 'collab'] or 'imdb' in dataset:
+elif dataset in ['synthetic', 'linux', 'nasa', 'reddit10k', 'collab'] or 'imdb' in dataset:
     node_feat_name = None
     node_feat_encoder = 'constant_1'
     if dataset == 'linux' or dataset == 'nasa':
@@ -96,7 +96,7 @@ model = 'siamese_regression'  # model is here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 flags.DEFINE_string('csm_model', model, 'Model string.')
 """ model_name: 'SimGNN', 'GSimCSM_CNN', None. """
 flags.DEFINE_string('csm_model_name', 'Our Model', 'Model name string.')
-flags.DEFINE_integer('csm_batch_size', 144, 'Number of graph pairs in a batch.')
+flags.DEFINE_integer('csm_batch_size', 128, 'Number of graph pairs in a batch.')
 ds_norm = True
 if ds_metric == 'glet':
     assert ds_norm
@@ -249,7 +249,7 @@ if model in ['siamese_regression', 'siamese_ranking', 'siamese_matching']:
     flags.DEFINE_string(
         'csm_layer_{}'.format(layer),
         'CSM_GraphConvolutionCollector:gcn_num={},'
-        'fix_size=50,mode=0,padding_value=0,align_corners=True,perturb={}'.
+        'fix_size=10,mode=0,padding_value=0,align_corners=True,perturb={}'.
             format(gcn_num, perturb), '')
     layer += 1
 
@@ -686,7 +686,7 @@ flags.DEFINE_float('csm_learning_rate', 0.001, 'Initial learning rate.')
 
 # For training and validating.
 flags.DEFINE_integer('csm_gpu', 3, 'Which gpu to use.')  # -1: cpu
-flags.DEFINE_integer('csm_iters', 15000, 'Number of iterations to train.')
+flags.DEFINE_integer('csm_iters', 5, 'Number of iterations to train.')
 flags.DEFINE_integer('csm_iters_val_start', 1400,
                      'Number of iterations to start validation.')
 flags.DEFINE_integer('csm_iters_val_every', 200, 'Frequency of validation.')

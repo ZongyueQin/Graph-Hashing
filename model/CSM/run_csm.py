@@ -24,6 +24,7 @@ import os, traceback
 from CSMDataFetcher import CSMDataFetcher
 from CSM import CSM
 import numpy as np
+import random
 
 def readGroundTruth(f):
     ged_cnt = {}
@@ -48,42 +49,52 @@ def computeTestMSEWithGroundTruth(sess, saver, csm,
                                   ground_truth,
                                   per_test_cnt = 10):
     total_query_num = data_fetcher.get_test_graphs_num()
-    MSE_test = 0
-    
+   # MSE_test = 0
+    MSE_list = []
     for i in range(0, total_query_num):
         g1 = data_fetcher.test_graphs[i]
         g_list1 = [g1]
 
         q = data_fetcher.get_test_graph_gid(i)
-
-        ground_truth[q] = sorted(ground_truth[q],
-                                key=lambda x: x[1]*10000000 + x[0])
-
+#        ground_truth[q] = sorted(ground_truth[q],
+#                                key=lambda x: x[1]*10000000 + x[0])
+        random.shuffle(ground_truth[q])
             # Second batch, the closest graphs
         g_list2 = []
         GT = []
 
         thres_scores = []        
-        for pair in ground_truth[q][0:per_test_cnt]:
-            true_ged = pair[1]
-            gid = pair[0]
-            g2 = data_fetcher.getGraphByGid(gid)
-            g_list2.append(g2)
-            normalzied_ged = true_ged*2/(len(g1.nxgraph.nodes())+len(g2.nxgraph.nodes()))
-            thres = CSM_FLAGS.csm_GED_threshold*2/(len(g1.nxgraph.nodes())+len(g2.nxgraph.nodes()))
-            thres = np.exp(-thres)
-            score = np.exp(-normalzied_ged)
-            GT.append(score)
-            thres_scores.append(thres)
+#        pos = 0
+#        while ground_truth[q][pos][1] < CSM_FLAGS.csm_GED_threshold:
+#            pos = pos + 1
+        pos = per_test_cnt
+        if pos > 0:
             
-        pred = csm.predict(sess, saver, g_list1, g_list2)
-        GT = np.array(GT)
-        pred = np.squeeze(pred)
-        thres_scores = np.array(thres_scores)
-        GT[GT == thres_scores] = 0
-        MSE_test = MSE_test + (np.mean((GT-pred)**2))/total_query_num
-
-    print('MSE for test = {:f}'.format(MSE_test))
+            for pair in ground_truth[q][0:pos]:
+                true_ged = pair[1]
+#                print(true_ged, end=' ')
+                gid = pair[0]
+                g2 = data_fetcher.getGraphByGid(gid)
+                g_list2.append(g2)
+                normalzied_ged = true_ged*2/(len(g1.nxgraph.nodes())+len(g2.nxgraph.nodes()))
+ #               thres = CSM_FLAGS.csm_GED_threshold*2/(len(g1.nxgraph.nodes())+len(g2.nxgraph.nodes()))
+ #               thres = np.exp(-thres)
+                score = np.exp(-normalzied_ged)
+                GT.append(score)
+ #               thres_scores.append(thres)
+ #           print(' ')
+            pred = csm.predict(sess, saver, g_list1, g_list2)
+            GT = np.array(GT)
+            
+            pred = np.squeeze(pred)
+ #           thres_scores = np.array(thres_scores)
+        
+#        GT[GT == thres_scores] = 0
+  #          GT = GT[GT > thres_scores]
+  #          pred = pred[GT > thres_scores]
+  #          MSE_test = MSE_test + (np.mean((GT-pred)**2))/pos #total_query_num
+            MSE_list = MSE_list + list((GT-pred)**2)
+    print('MSE for test = {:f}'.format((sum(MSE_list)/len(MSE_list))))
 
 def main():
     t = time()
@@ -91,7 +102,7 @@ def main():
     check_flags()
     print(get_model_info_as_str())
 
-    data_fetcher = CSMDataFetcher(CSM_FLAGS.csm_dataset, True)
+    data_fetcher = CSMDataFetcher(CSM_FLAGS.csm_dataset, False)
     model = CSM(data_fetcher)
     os.environ["CUDA_VISIBLE_DEVICES"] = str(CSM_FLAGS.csm_gpu)
     config = tf.ConfigProto()
@@ -111,8 +122,8 @@ def main():
             f = open(ground_truth_path, 'r')
             ground_truth, ged_cnt = readGroundTruth(f)
             has_GT = True
-    #        computeTestMSEWithGroundTruth(sess, saver, model, 
-    #                                      data_fetcher, ground_truth)
+            computeTestMSEWithGroundTruth(sess, saver, model, 
+                                          data_fetcher, ground_truth)
         except IOError:
             print('Groundtruth file doesn\'t exist, ignore top-k and range query')
             has_GT = False
