@@ -14,6 +14,8 @@ def computeCSMTestMSEWithGroundTruth(sess, saver, csm,
                                      csm_data_fetcher, 
                                      ground_truth,
                                      per_test_cnt = 10):
+    raise NotImplementedError
+    """
     total_query_num = csm_data_fetcher.get_test_graphs_num()
     MSE_test = 0
     
@@ -52,14 +54,19 @@ def computeCSMTestMSEWithGroundTruth(sess, saver, csm,
         MSE_test = MSE_test + (np.mean((GT-pred)**2))/total_query_num
 
     print('MSE for test = {:f}'.format(MSE_test))
-
+    """
 
 def computeTrainingMSE(sess, model, thres, data_fetcher, placeholders,
-                       pair_num=100, use_code=True, use_emb=True):
+                       pair_num=100, use_code=True, use_emb=True,
+                       encode_batchsize=(1+FLAGS.k)*FLAGS.batchsize):
     # Compute MSE of estimated GED for training data
     # Randomly sample 100 pairs and compute MSE
+    if encode_batchsize < 2:
+        raise RuntimeError('encode_batchsize need to > 2 to compute training MSE')
+
     train_graph_num = data_fetcher.get_train_graphs_num()
-    encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
+#    encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
+    
     print('Computing training MSE...')
     MSE_train_con = 0
     MSE_train_dis = 0
@@ -133,12 +140,14 @@ def computeTrainingMSE(sess, model, thres, data_fetcher, placeholders,
 
 
 def computeTestMSEWithoutGroundTruth(model, sess, thres, data_fetcher, placeholders,
-                         use_code=True, use_emb=True):
+                         use_code=True, use_emb=True, 
+                         encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize):
+
+
     total_query_num = data_fetcher.get_test_graphs_num()
     train_graph_num = data_fetcher.get_train_graphs_num()
     test_ged_cnt = {}
     pred_cnt = {}
-    encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
     MSE_test_con = 0
     MSE_test_dis = 0
     
@@ -240,9 +249,10 @@ def computeTestMSEWithoutGroundTruth(model, sess, thres, data_fetcher, placehold
 def computeTestMSEWithGroundTruth(sess, model, thres, placeholders, 
                                   data_fetcher, ground_truth,
                                   id2emb, id2code,
-                                  use_code=True, use_emb=True):
+                                  use_code=True, use_emb=True,
+                                  encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize):
     total_query_num = data_fetcher.get_test_graphs_num()
-    encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
+    
     test_ged_cnt = {}
     pred_cnt = {}
     MSE_test_con = 0
@@ -291,7 +301,7 @@ def computeTestMSEWithGroundTruth(sess, model, thres, placeholders,
             ground_truth[q] = sorted(ground_truth[q], 
                                      key=lambda x: x[1]*10000000 + x[0])
             
-            # Second batch, the closest graphs
+            # compute the closest graphs
             for pair in ground_truth[q][0:encode_batchsize]:
                 true_ged = pair[1]  
                 gid = pair[0]
@@ -330,8 +340,8 @@ def computeTestMSEWithGroundTruth(sess, model, thres, placeholders,
 def topKQuery(sess, model, data_fetcher, ground_truth,
               inverted_index,
               placeholders,
-              index_index_fname='SavedModel/inverted_index.index',
-              index_value_fname='SavedModel/inverted_index.value',
+              index_index_fname='SavedModel/inverted_index_'+FLAGS.dataset+'.index',
+              index_value_fname='SavedModel/inverted_index_'+FLAGS.dataset+'.value',
               #input_batchsize = 1,
               use_code=True, use_emb=True):
     thres = np.zeros(FLAGS.hash_code_len)
@@ -343,8 +353,8 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
     KRCCs = []
     search_time = []
     encode_time = []
-#    encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
-    encode_batchsize=1
+    encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
+#    encode_batchsize=1
 
     for i in range(0, total_query_num, encode_batchsize):   
 
@@ -352,7 +362,7 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
         if end > total_query_num:
             end = total_query_num
 
-        
+        """    
         for j in range(i, end):
 
             if i + j >= total_query_num:
@@ -361,7 +371,7 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
             q = data_fetcher.get_test_graph_gid(i + j)
             ground_truth[q] = sorted(ground_truth[q], 
                                      key=lambda x: x[1]*10000000 + x[0])
- 
+         """
 
 #        idx_list = list(range(i,end))
 #        while (len(idx_list) < encode_batchsize):
@@ -397,6 +407,8 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
                 break
 
             q = data_fetcher.get_test_graph_gid(i+j)
+            ground_truth[q] = sorted(ground_truth[q], 
+                                     key=lambda x: x[1]*10000000 + x[0])
 
             code = tup[0]
             emb = tup[1]
@@ -561,6 +573,8 @@ def traditionalApproxVerification(q_idx, candidate_set, data_fetcher, upbound):
     return ret_set
 
 def BssGedServerVerification(q_idx, candidate_set, data_fetcher, upbound, port=12345):
+    raise NotImplementedError
+    """
     if len(candidate_set) == 0:
         return set(), 0
 
@@ -621,7 +635,8 @@ def BssGedServerVerification(q_idx, candidate_set, data_fetcher, upbound, port=1
     #os.remove(q_fname)
     #os.remove(g_fname)
     return ret_set, verify_time
-    
+    """
+
 def BssGedVerification(q_idx, candidate_set, data_fetcher, upbound):
     if len(candidate_set) == 0:
         return set(), 0
@@ -631,13 +646,15 @@ def BssGedVerification(q_idx, candidate_set, data_fetcher, upbound):
     g_fname = data_fetcher.writeGraphList2TempFile(candidate_set)
     ret_set = set()
 
+    #start_time = time.time()
     geds = subprocess.check_output(['./ged', q_fname, '1', g_fname, 
                                    str(len(candidate_set)), 
                                    str(upbound),
                                    str(FLAGS.beam_width)])
-        
+    #verify_time = time.time() - start_time
     geds = geds.split()
     verify_time = float(geds[-1])
+    
     geds = geds[0:-1]
     #print(geds)
     for i, ged in enumerate(geds):
@@ -657,6 +674,7 @@ def CSMVerification(q_idx, candidate_set, csm_data_fetcher, upbound, csm, sess, 
     g_graphs = [csm_data_fetcher.getGraphByGid(gid) for gid in candidate_set]
     query_graph = csm_data_fetcher.test_graphs[q_idx]
 
+    start_time = time.time()
     scores = csm.predict(sess, csm_saver, [query_graph], g_graphs)
     scores = np.resize(scores, (scores.size))
 
@@ -669,7 +687,8 @@ def CSMVerification(q_idx, candidate_set, csm_data_fetcher, upbound, csm, sess, 
         if thres_scores[i] <= scores[i]:
             ret_set.add(candidate_set[i])
 
-    return ret_set
+    verify_time = time.time() - start_time
+    return ret_set, verify_time
 
 def rangeQueryVerification(q_idx, candidate_set, data_fetcher, upbound, 
                            csm=None, csm_data_fetcher=None, sess = None, csm_saver=None):
@@ -698,7 +717,7 @@ def rangeQueryVerification(q_idx, candidate_set, data_fetcher, upbound,
     """
     #return traditionalApproxVerification(q_idx, candidate_set, data_fetcher, upbound)
     if csm is None:
-      return BssGedServerVerification(q_idx, candidate_set, data_fetcher, upbound)
+      return BssGedVerification(q_idx, candidate_set, data_fetcher, upbound)
     else:
       return CSMVerification(q_idx, candidate_set, csm_data_fetcher, upbound, csm, sess, csm_saver)
 
@@ -717,8 +736,8 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
 
     total_query_num = data_fetcher.get_test_graphs_num()
     train_graph_num = data_fetcher.get_train_graphs_num()
-    #encode_batchsize=(1+FLAGS.k) * FLAGS.batchsize    
-    encode_batchsize = 1
+    encode_batchsize=(1+FLAGS.k) * FLAGS.batchsize    
+    #encode_batchsize = 1
 
     precisions = [[] for i in range(t_min, t_max+1)]
     recalls = [[] for i in range(t_min, t_max+1)]
@@ -865,8 +884,6 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                 precisions_cdd[t-t_min].append(precision)
                 if len(real_sim_set) > 0:
                     precisions_nz_cdd[t-t_min].append(precision)
-                    print(real_sim_set)
-                    print(candidate_set)
                  
 
                 if len(real_sim_set) == 0:
@@ -933,7 +950,6 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                 
                 precisions[t-t_min].append(precision)
                 if len(real_sim_set) > 0:
-                    print(similar_set)
                     precisions_nz[t-t_min].append(precision)
 
                 if len(real_sim_set) == 0:

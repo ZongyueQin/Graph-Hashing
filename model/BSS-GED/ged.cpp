@@ -99,15 +99,15 @@ int main(int argc, char *argv[])
 //				sum++;
 //			}
 			cout << ged << endl;
+			FLAG = true;
 		}
-		FLAG = true;
 	}
 	
 //	cout << "total expand node " << totalExpandNode << endl;
 //	cout << "initFilter and total results " << initFilter  << " " << sum << endl;
-//	gettimeofday(&end, NULL); 
-//	timeuse = 1000000 * (end.tv_sec - start.tv_sec) + end.tv_usec - start.tv_usec; 
-//	timeuse = timeuse * 1.0 / 1000000; 
+	gettimeofday(&end, NULL); 
+	timeuse = 1000000 * (end.tv_sec - start.tv_sec) + end.tv_usec - start.tv_usec; 
+	timeuse = timeuse * 1.0 / 1000000; 
 	cout << timeuse << endl;
 	//}
 	return 0;

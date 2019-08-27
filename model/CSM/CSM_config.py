@@ -104,7 +104,7 @@ if ds_metric == 'glet':
 flags.DEFINE_boolean('csm_ds_norm', ds_norm,
                      'Whether to normalize the distance or not '
                      'when choosing the ground truth distance.')
-flags.DEFINE_boolean('csm_node_embs_norm', False,
+flags.DEFINE_boolean('csm_node_embs_norm', True,
                      'Whether to normalize the node embeddings or not.')
 need_gc = False
 pred_sim_dist, supply_sim_dist = None, None
