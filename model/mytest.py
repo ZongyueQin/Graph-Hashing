@@ -5,8 +5,8 @@ class myInt:
 A = myInt(0)
 
 def build(a):
-    A.a = a
-    return a
+    print(a)
+    return a[0][0]
 
 def turn(a):
     print(a)

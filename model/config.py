@@ -12,7 +12,7 @@ flags.DEFINE_string('node_label_name', 'label', 'Name of node label, none if it\
 flags.DEFINE_boolean('clip', True, 'clip GED beyond GED_threshold')
 
 # data sample related
-flags.DEFINE_integer('k', 5, 'when training, we would generate k similar graphs for each one of sampled graphs')
+flags.DEFINE_integer('k', 1, 'when training, we would generate k similar graphs for each one of sampled graphs')
 flags.DEFINE_integer('GED_threshold', 11, 'threshold within which 2 graphs are similar')
 flags.DEFINE_integer('batchsize',10,'batch size for training')
 flags.DEFINE_string('label_type', 'ged', 'whether training label should be binary or ged')

@@ -297,9 +297,10 @@ class GraphHash_Emb_Code(Model):
         super(GraphHash_Emb_Code, self).__init__(**kwargs)
 
         self.graph_embs = []
-        self.inputs = [next_ele[0], next_ele[1], next_ele[2]]
-        self.labels = next_ele[3]
-        self.gen_labels = next_ele[4]
+        if next_ele is not None:
+            self.inputs = [next_ele[0], next_ele[1], next_ele[2]]
+            self.labels = next_ele[3]
+            self.gen_labels = next_ele[4]
             
         self.input_dim = input_dim
         # self.input_dim = self.inputs.get_shape().as_list()[1]  # To be supported in future Tensorflow versions
@@ -309,7 +310,12 @@ class GraphHash_Emb_Code(Model):
 
         self.optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate)
 
-        self.build()
+        """ Wrapper for _build() """
+        with tf.variable_scope(self.name):
+            self._build()
+
+        if next_ele is not None:
+            self.build()
         
         self.build_encode()
             
@@ -413,10 +419,6 @@ class GraphHash_Emb_Code(Model):
 
 
     def build(self):
-        """ Wrapper for _build() """
-        with tf.variable_scope(self.name):
-            self._build()
-
         # Build layer model
         self.activations.append(self.inputs)
         # conv layers

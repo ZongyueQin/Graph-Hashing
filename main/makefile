@@ -25,4 +25,7 @@ ${DIR_BIN}/test:${OBJ} test.cpp
 
 
 ${DIR_OBJ}/%.o:${DIR_SRC}/%.cpp
-	$(CC) $(CFLAGS) -c  $<  -o $@
+	$(CC) $(CFLAGS) -c  $<  $(ldflags) $(cflags) -o $@
+
+clean:
+	rm ${DIR_OBJ}/*.o bin/main bin/test

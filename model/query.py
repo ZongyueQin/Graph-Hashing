@@ -669,7 +669,7 @@ def BssGedVerification(q_idx, candidate_set, data_fetcher, upbound):
     
 def CSMVerification(q_idx, candidate_set, csm_data_fetcher, upbound, csm, sess, csm_saver):
     if len(candidate_set) == 0:
-        return set()
+        return set(), 0
     candidate_set = list(candidate_set)
     g_graphs = [csm_data_fetcher.getGraphByGid(gid) for gid in candidate_set]
     query_graph = csm_data_fetcher.test_graphs[q_idx]
@@ -736,8 +736,8 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
 
     total_query_num = data_fetcher.get_test_graphs_num()
     train_graph_num = data_fetcher.get_train_graphs_num()
-    encode_batchsize=(1+FLAGS.k) * FLAGS.batchsize    
-    #encode_batchsize = 1
+    #encode_batchsize=(1+FLAGS.k) * FLAGS.batchsize    
+    encode_batchsize = 1
 
     precisions = [[] for i in range(t_min, t_max+1)]
     recalls = [[] for i in range(t_min, t_max+1)]
@@ -853,14 +853,15 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
                                                    str(FLAGS.hash_code_len),
                                                    str(FLAGS.embedding_dim),
                                                    '-1'])
-#                ret = ret.split()
-                search_time[t-t_min].append(time.time()-start_time)
-#                search_time[t-t_min].append(float(ret[-1]))
-#                ret = ret[0:-1]
+                ret = ret.split()
+#                search_time[t-t_min].append(time.time()-start_time)
+                search_time[t-t_min].append(float(ret[-1]))
+                ret = ret[0:-1]
                 if i + j == 0:
                     print('t={:d}, cost {:f} s'.format(t, time.time()-start_time))
                     
-                candidate_set = set([int(gid) for gid in ret.split()])
+#                candidate_set = set([int(gid) for gid in ret.split()])
+                candidate_set = set([int(gid) for gid in ret])
 
 
                 while cur_pos < len(ground_truth[q]) and\
@@ -978,6 +979,7 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
 
     print('For range query')
     print('average encode time = {:f}'.format(sum(encode_time)/len(encode_time)))
+    te = sum(encode_time)/len(encode_time)
     for t in range(t_min, t_max+1):
         print('threshold = {:d}'.format(t), end=' ')
         print('empty cnt = {:d}'.format(zero_cnt[t-t_min]), end = ' ')
@@ -992,7 +994,10 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
         print('average f1-score = %f'%(sum(f1_scores[t-t_min])/len(f1_scores[t-t_min])), end = ' ')
 #        print('average return size = %f'%(sum(ret_size[t-t_min])/len(ret_size[t-t_min])), end = ' ')
         print('average search time = {:f}'.format(sum(search_time[t-t_min])/len(search_time[t-t_min])), end= ' ')
-        print('average verify time = {:f}'.format(sum(verify_time[t-t_min])/len(verify_time[t-t_min])))
+        print('average verify time = {:f}'.format(sum(verify_time[t-t_min])/len(verify_time[t-t_min])), end = ' ')
+        ts = sum(search_time[t-t_min])/len(search_time[t-t_min])
+        tv = sum(verify_time[t-t_min])/len(verify_time[t-t_min])
+        print('average total time = {:f}'.format(te+ts+tv))
 
     print('ignore empty answers')
     for t in range(t_min,t_max+1):

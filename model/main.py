@@ -39,7 +39,7 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
 """ Specific which metrics to test """
-use_csm = True
+use_csm = False
 test_top_k = False
 test_range_query = True
 train_mse = False
@@ -49,7 +49,7 @@ test_range_query_csm = False
 
 """ train the model or load existing model """
 train = True
-model_name = "csm_code_emb__"+FLAGS.dataset
+model_name = "code_emb_"+FLAGS.dataset
 model_path = "SavedModel/"+model_name+".ckpt"
 saved_files_dir = "SavedModel"
 
@@ -96,8 +96,9 @@ placeholders = {
     'features': tf.sparse_placeholder(tf.float32, shape=(None, data_fetcher.get_node_feature_dim())),
     'labels': tf.placeholder(tf.float32, shape=(FLAGS.batchsize, FLAGS.batchsize)),
     'dropout': tf.placeholder_with_default(0., shape=()),
-    'graph_sizes': tf.placeholder(tf.int32, shape=(FLAGS.batchsize*(1+FLAGS.k))),
+#    'graph_sizes': tf.placeholder(tf.int32, shape=(FLAGS.batchsize*(1+FLAGS.k))),
 #    'graph_sizes': tf.placeholder(tf.int32, shape=(None)),
+    'graph_sizes': tf.placeholder(tf.int32, shape=(1)),
     'generated_labels':tf.placeholder(tf.float32, shape=(FLAGS.batchsize, FLAGS.k)),
     'thres':tf.placeholder(tf.float32, shape=(FLAGS.hash_code_len))
 }

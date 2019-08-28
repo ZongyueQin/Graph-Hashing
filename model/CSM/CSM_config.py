@@ -686,7 +686,7 @@ flags.DEFINE_float('csm_learning_rate', 0.001, 'Initial learning rate.')
 
 # For training and validating.
 flags.DEFINE_integer('csm_gpu', 3, 'Which gpu to use.')  # -1: cpu
-flags.DEFINE_integer('csm_iters', 5, 'Number of iterations to train.')
+flags.DEFINE_integer('csm_iters', 15000, 'Number of iterations to train.')
 flags.DEFINE_integer('csm_iters_val_start', 1400,
                      'Number of iterations to start validation.')
 flags.DEFINE_integer('csm_iters_val_every', 200, 'Frequency of validation.')

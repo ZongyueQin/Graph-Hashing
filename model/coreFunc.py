@@ -1,0 +1,92 @@
+import tensorflow as tf
+import numpy as np
+import os
+
+import random
+
+from utils import *
+from graphHashFunctions import GraphHash_Emb_Code
+from config import FLAGS
+from DataFetcher import DataFetcher
+
+os.environ['CUDA_VISIBLE_DEVICES']='0,3'
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+
+""" Load datafetcher only to get node_feature_dim, probably should use more efficient way to do that in future """
+data_fetcher = DataFetcher(dataset=FLAGS.dataset, exact_ged=True)
+# Define placeholders
+placeholders = {
+    'support': tf.sparse_placeholder(tf.float32),
+    'features': tf.sparse_placeholder(tf.float32, shape=(None, data_fetcher.get_node_feature_dim())),
+#    'labels': tf.placeholder(tf.float32, shape=(FLAGS.batchsize, FLAGS.batchsize)),
+    'dropout': tf.placeholder_with_default(0., shape=()),
+    'graph_sizes': tf.placeholder(tf.int32, shape=(1)),
+#    'graph_sizes': tf.placeholder(tf.int32, shape=(FLAGS.batchsize*(1+FLAGS.k))),
+#    'generated_labels':tf.placeholder(tf.float32, shape=(FLAGS.batchsize, FLAGS.k)),
+    'thres':tf.placeholder(tf.float32, shape=(FLAGS.hash_code_len))
+}
+
+thres = np.zeros(FLAGS.hash_code_len)
+
+# Create Model
+model = GraphHash_Emb_Code(placeholders, 
+                           input_dim=data_fetcher.get_node_feature_dim(),
+                           next_ele = None,
+                           logging=True)
+
+# Initialize session
+sess = tf.Session(config=config)
+
+# Init variables
+saver = tf.train.Saver()
+
+def loadModel(model_path):
+    saver.restore(sess, model_path)
+    print("Model restored from", model_path)
+    return True
+
+def getCodeAndEmbByQid(qid):
+#    print(qid)
+    
+    query_graph = data_fetcher.gid2graph[qid] 
+#    print(query_graph)
+    features = query_graph.sparse_node_inputs
+    features = data_fetcher._sparse_to_tuple(features)
+
+    laplacian = query_graph.laplacian
+    laplacian = data_fetcher._sparse_to_tuple(laplacian)
+    
+    size = [query_graph.nxgraph.number_of_nodes()]
+
+    code, emb = getCodeAndEmb(features, laplacian, size)
+    code = tupleCode2IntegerCode(code[0])
+#    print(code)
+#    print('done')
+#    print(tuple(emb[0]))
+    emb = tuple(emb[0])
+#    print(len(emb))
+
+#    return code, emb
+#    print(code)    
+#    print(type(code))
+#    print(emb)
+#    emb = [3 for i in range(256)]
+#    emb = tuple(emb)
+    return (code, emb)
+    
+
+def getCodeAndEmb(features, laplacian, size):
+    feed_dict = dict()
+    feed_dict.update({placeholders['dropout']: 0})
+    feed_dict.update({placeholders['features']: features})
+    feed_dict.update({placeholders['support']: laplacian})
+   # feed_dict.update({placeholders['num_features_nonzero']: [data_fetcher.batch_node_num]})
+    feed_dict.update({placeholders['graph_sizes']: size})
+    feed_dict.update({placeholders['thres']:thres})
+
+    code, emb = sess.run([model.codes, model.ecd_embeddings],
+                         feed_dict = feed_dict)
+
+    return code, emb
+ 

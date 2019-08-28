@@ -184,8 +184,8 @@ def encodeTrainingData(sess, model, data_fetcher, placeholders,
     print('start encoding training data...')
     train_graph_num = data_fetcher.get_train_graphs_num()
     inverted_index = {}
-    encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
-    #encode_batchsize=1
+    #encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
+    encode_batchsize=1
     all_codes = []
     all_embs = []
     thres = np.zeros(FLAGS.hash_code_len)

@@ -1,4 +1,6 @@
 #include <fstream>
+#include <iostream>
+#include <sys/time.h>
 #include <assert.h>
 #include <cstdlib>
 #include <string>
@@ -137,6 +139,11 @@ int main(int argc, char **argv)
 	}
 	close(fd2);
 
+	struct timeval start,end; 
+	float timeuse; 
+	gettimeofday(&start, NULL); 
+
+
         int codeLen = atoi(argv[7]);
 	int embLen = atoi(argv[8]); 
 	GInfo qInfo;
@@ -173,6 +180,11 @@ int main(int argc, char **argv)
 		}
 	}
 
+	gettimeofday(&end, NULL); 
+	timeuse = 1000000 * (end.tv_sec - start.tv_sec) + end.tv_usec - start.tv_usec; 
+	timeuse = timeuse * 1.0 / 1000000; 
+	cout << timeuse << endl;
+	
 	munmap((void*) code2Pos, 2*sizeof(uint64_t)*totalCodeCnt);
 	munmap((void*) invertedIndexValue, sizeof(GInfo)*totalGraphCnt);
 	return 0;

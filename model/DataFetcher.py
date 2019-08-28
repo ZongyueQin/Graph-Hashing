@@ -555,7 +555,7 @@ class DataFetcher:
                 op_cannot_be_2 = len(tmp_g.edges()) == 0
                 
                 
-                op = randint(0, 4)
+                op = randint(0, 3)
                 while (can_delete_node is False and op == 4) or\
                 (op == 0 and 'constant' in self.node_feat_type) or\
                 (op >= 3 and j == op_num - 1) or\
