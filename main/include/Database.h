@@ -21,13 +21,15 @@ private:
 	GInfo *invertedIndexValue;
 	map <uint64_t, uint64_t> gid2Pos;
 
-//	PyObject *py_qid, *arg, *ret, *py_code, *py_emb, *py_dim;
+public:
+	float totalEncodeTime, totalSearchTime, totalVerifyTime;
+	int GED2Hamming[10];
+
 public:
 	Database(const string &modelPath, const string &db,  
-		 const string &invIdxIdxPath, 
-		 const string &invIdxValPath,
-		 int totalGraph, int _embLen, int _codeLen,
-		 int _totalCodeCnt);
+		 const string &invIndex,
+		 int totalGraph, int _codeLen,
+		 const string &GED2HammingFile="");
 	~Database()
 	{
 		int totalGraphCnt = graphDB.size();
@@ -35,9 +37,13 @@ public:
 		munmap((void*)invertedIndexValue, sizeof(GInfo)*totalGraphCnt);
 		Py_Finalize();
 	}
+	bool QueryProcessGetCandidate(const int qid, const int ub, const int width,
+		bool fineGrained, const graph &q, vector<int> &ret);
 
 	bool QueryProcess(const int qid, const int ub, const int width,
-		bool fineGrained, const graph &q, vector<int> &ret);
+		bool fineGrained, const graph &q, vector<int> &ret, vector<int> &candGid);
+
+	bool topKQueryProcess(const int gid, const int K, vector<uint64_t> &ret, int thres = 11); 
 private:
 	bool Verify(const graph &query, const vector<graph> &candidates, 
 		 const int ub, const int width,

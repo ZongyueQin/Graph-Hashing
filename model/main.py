@@ -49,7 +49,7 @@ test_range_query_csm = False
 
 """ train the model or load existing model """
 train = True
-model_name = "code_emb_"+FLAGS.dataset
+model_name = "0902:code_emb_ours_"+FLAGS.dataset
 model_path = "SavedModel/"+model_name+".ckpt"
 saved_files_dir = "SavedModel"
 
@@ -225,7 +225,7 @@ else:
         if not use_csm:
             rangeQuery(sess, model, data_fetcher, ground_truth,
               placeholders, inverted_index, 
-              t_min=1, t_max=6,
+              t_min=1, t_max=3,
               index_index_fname=inv_idx_idx,
               index_value_fname=inv_idx_val)
 

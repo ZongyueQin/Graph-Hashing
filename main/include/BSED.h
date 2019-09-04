@@ -297,8 +297,8 @@ public:
 	inline int getEditDistance(graph &g1, graph &g2, int bound)
 	{
 
-		u8 lv_1[256], lv_2[256], le_1[64], le_2[64];
-		memset(lv_1, 0, 256 * sizeof(u8)); memset(lv_2, 0, 256 * sizeof(u8));
+		u8 lv_1[30000], lv_2[30000], le_1[64], le_2[64];
+		memset(lv_1, 0, 30000 * sizeof(u8)); memset(lv_2, 0, 30000 * sizeof(u8));
 		memset(le_1, 0, 64 * sizeof(u8)); memset(le_2, 0, 64 * sizeof(u8));
 		max_v_1 = max_v_2 = max_e_1 = max_e_2 = 0;
 
@@ -364,7 +364,10 @@ public:
 		{
 			int len = tmpDegree1[i]; //chongdu
 			for (int l = 0; l < len; l++)
+			{
+				if (size1 >= 512) cout << "size1 >= 512" << endl;
 				ds1[size1++] = i;
+			}
 		}
 		for (i = 0; i < g2.v; i++)
 		{
@@ -376,7 +379,10 @@ public:
 		{
 			int len = tmpDegree2[i];
 			for (int l = 0; l < len; l++)
+			{
+				if (size2 >= 512) cout << "size >= 512" << endl;
 				ds2[size2++] = i;
+			}
 		}
 		common::degreeEditDistance(ds1, size1, ds2, size2, ie, de);
 		int tmp = max(2 * ie + edge1 - edge2, 2 * de + edge2 - edge1);

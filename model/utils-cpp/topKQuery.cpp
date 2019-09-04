@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <algorithm>
 #include <vector>
-#include "common.h"
+#include "../../main/include/utils.h"
 #include<sys/types.h>
 #include<fcntl.h>
 #include <unistd.h>
@@ -181,7 +181,8 @@ int main(int argc, char **argv)
 	int fd1 = open(argv[3], O_RDWR, 00777);
 
 	int totalCodeCnt = atoi(argv[5]);
-	CodePos *code2Pos = (CodePos*) mmap(NULL, 2*sizeof(uint64_t)*totalCodeCnt, 
+//	CodePos *code2Pos = (CodePos*) mmap(NULL, 2*sizeof(uint64_t)*totalCodeCnt, 
+	CodePos *code2Pos = (CodePos*) mmap(NULL, sizeof(CodePos)*totalCodeCnt, 
 					PROT_READ, 
 					MAP_SHARED,
 					fd1, 0);

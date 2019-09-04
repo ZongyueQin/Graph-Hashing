@@ -192,15 +192,18 @@ class DataFetcher:
             """
             fname = self.writeSampledGraphList2TempFile()
             g_cnt = str(len(self.sample_graphs))
-            ret = subprocess.check_output(['./ged', fname, g_cnt, fname, g_cnt, 
+            try:
+                ret = subprocess.check_output(['./ged', fname, g_cnt, fname, g_cnt, 
                                        str(FLAGS.GED_threshold - 1),
-                                       str(FLAGS.beam_width)])
+                                       str(FLAGS.beam_width)], timeout=60)
 
-            geds = [float(ged) for ged in ret.split()][0:-1]
-            geds = np.array(geds)
-            geds[geds==-1] = FLAGS.GED_threshold
-            self.labels = np.resize(geds, (batchsize, batchsize))
-
+                geds = [float(ged) for ged in ret.split()][0:-1]
+                geds = np.array(geds)
+                geds[geds==-1] = FLAGS.GED_threshold
+                self.labels = np.resize(geds, (batchsize, batchsize))
+            except subprocess.TimeoutExpired:
+                print('BSS-GED timeout, use Approxmate GED instead')
+                self.labels = self.getApproxGEDForEachPair(self.sample_graphs)
 
         return
  
@@ -540,7 +543,10 @@ class DataFetcher:
         for i in range(k):
             tmp_g = g.nxgraph.copy()
             # sample how many edit operation to perform
-            op_num = randint(1,6)#FLAGS.GED_threshold-2)
+        #    op_num = randint(1,7)#FLAGS.GED_threshold-2)
+        #    if op_num  == 7:
+        #        op_num = 1
+            op_num = randint(1,3)
             # though not accurate, may be good enough
             geds.append(op_num)
             j = 0

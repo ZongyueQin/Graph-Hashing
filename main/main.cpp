@@ -14,10 +14,10 @@ using namespace std;
 
 int main(int argc, char **argv)
 {
-	if(argc < 10)
+	if(argc < 8)
 	{
 		cout << "database n query m  w model_path " << 
-			 "inv_idx_txt inv_idx_idx inv_idx_val " << endl; 
+			 "inv_idx_txt [mapper_file]" << endl; 
 		exit(0);
 	}
 	string db_path = argv[1]; 
@@ -29,22 +29,14 @@ int main(int argc, char **argv)
 	string model_path = argv[6];
 
 	string invIdxTxtPath = argv[7];
-	ifstream fin(invIdxTxtPath);
-	if (!fin)
-	{
-		cout << "Unable to open " << invIdxTxtPath << endl;
-		return 0;
-	}
-	int totalCodeCnt, embLen;
-	fin >> totalCodeCnt >> embLen;
-	fin.close();
 
-	string invIdxIdxPath = argv[8];
-	string invIdxValPath = argv[9];
+	string GED2HammingFile = "";
+	if (argc == 9)
+		GED2HammingFile = string(argv[8]);
 
 	Database database(model_path, db_path, 
-			invIdxIdxPath, invIdxValPath,
-			totalGraph, embLen, CODELEN, totalCodeCnt);
+			invIdxTxtPath,
+			totalGraph, CODELEN, GED2HammingFile);
 	
 	string query_out = query+"_ordered";
 	graph::reOrderGraphs(query.c_str(), query_out.c_str(), totalQuery);
@@ -54,14 +46,19 @@ int main(int argc, char **argv)
 
 
 	vector<int> result;
+	vector<int> candidates;
 
-	for(int ub = 1; ub < 10; ub++)
+	for(int ub = 0; ub < 6; ub++)
 	{
-		//database.QueryProcess(queryDB[0].graph_id, result);
 		stringstream ss;
-		ss << "t=" << ub << "-" << OUTPUTFILE;
+		ss << "output/linux15_tanh_t=" << ub << "_" << OUTPUTFILE;
 		string outputFile = ss.str();
 		ofstream fout(outputFile);
+
+		stringstream ss2;
+		ss2 << "output/linux15_tanh_t=" << ub << "_" << "candidate.txt";
+		string candidateFile = ss2.str();
+		ofstream fout2(candidateFile);
 
 		struct timeval start,end; 
 		float timeuse, totalTime = 0; 
@@ -69,11 +66,13 @@ int main(int argc, char **argv)
 		bool useFineGrainWhenPrune = true, retCode;
 		for(int i = 0; i < queryDB.size();i++)
 		{
+			result.clear();
+			candidates.clear();
 			graph q = queryDB[i];
 			gettimeofday(&start, NULL); 
 			retCode = database.QueryProcess(queryDB[i].graph_id, ub, width,
 					useFineGrainWhenPrune,
-					q, result);
+					q, result, candidates);
 			if (!retCode)
 			{
 				cout << "error when query " << q.graph_id << endl;
@@ -91,10 +90,26 @@ int main(int argc, char **argv)
 				fout << result[j] << ' ';
 			}
 			fout << endl;
+
+			fout2 << q.graph_id << ' ';
+			for(int j = 0; j < candidates.size(); j++)
+			{
+				fout2 << candidates[j] << ' ';
+			}
+			fout2 << endl;
+
 		}
 	
 		cout << "ub = " << ub << ", average response time = " << 
 			totalTime/queryDB.size() << " s" << endl;
+		cout << "average encode time: " << database.totalEncodeTime / queryDB.size() << "; ";
+		cout << "average search time: " << database.totalSearchTime / queryDB.size() << "; ";
+		cout << "average verify time: " << database.totalVerifyTime / queryDB.size() << "; ";
+
+		cout << "results written in " << ss.str() << endl;
+		database.totalEncodeTime = 0;
+		database.totalSearchTime = 0;
+		database.totalVerifyTime = 0;
 	}
 
 

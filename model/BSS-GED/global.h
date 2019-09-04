@@ -23,8 +23,8 @@ extern vector<int> group2;
 
 extern u8 start_deleted[64];
 extern u8 end_deleted[64];
-extern u8 tmpDegree1[64];
-extern u8 tmpDegree2[64];
+extern u8 tmpDegree1[512];
+extern u8 tmpDegree2[512];
 extern u8 edgeList1[64];
 extern u8 edgeList2[64];
 extern u8 edge_set_1[512];

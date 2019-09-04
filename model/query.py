@@ -353,8 +353,8 @@ def topKQuery(sess, model, data_fetcher, ground_truth,
     KRCCs = []
     search_time = []
     encode_time = []
-    encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
-#    encode_batchsize=1
+#    encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
+    encode_batchsize=1
 
     for i in range(0, total_query_num, encode_batchsize):   
 
@@ -732,6 +732,7 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
               index_value_fname='SavedModel/inverted_index_'+FLAGS.dataset+'.value',
               #input_batchsize = 1,
               use_code=True, use_emb=True):
+#    f = open('QINFO.txt', 'w')
     thres = np.zeros(FLAGS.hash_code_len)
 
     total_query_num = data_fetcher.get_test_graphs_num()
@@ -827,6 +828,13 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
             tuple_code = tuple(code)
             
             cur_pos = 0
+            #line = str(q) + ' ' + str(tupleCode2IntegerCode(tuple_code))+'\n'
+            #f.write(line)
+#            line = ''
+#            for dim in emb:
+#                line = line + ('%.6f'%dim) + ' '
+#            line = line + '\n'
+#            f.write(line)
             for t in range(t_min,t_max+1):
                     
                 start_time = time.time()
@@ -863,6 +871,11 @@ def rangeQuery(sess, model, data_fetcher, ground_truth,
 #                candidate_set = set([int(gid) for gid in ret.split()])
                 candidate_set = set([int(gid) for gid in ret])
 
+#                for tok in candidate_set:
+#                    line = line + str(tok) + ' '
+#                f.write(line)
+#                f.write('\n')
+ 
 
                 while cur_pos < len(ground_truth[q]) and\
                         ground_truth[q][cur_pos][1] <= t:

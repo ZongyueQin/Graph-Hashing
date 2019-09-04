@@ -12,8 +12,8 @@
 #include<string.h>
 struct CodePos
 {
-	int code;
-	int pos;
+	uint64_t code;
+	uint64_t pos;
 };
 
 class GInfo

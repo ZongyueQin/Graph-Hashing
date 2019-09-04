@@ -5,7 +5,42 @@
 
 #define PORT 12345
 #define BUFSIZE 20000
+void changeLabel(vector<int> &v1, vector<int> &v2)
+{
+	map<int, int> labelMapper;
+	int newLabel = 0;
+	map<int, int>::iterator iter;
+	for(int i = 0; i < v1.size(); i++)
+	{
+		iter = labelMapper.find(v1[i]);
+		int y;
+		if (iter == labelMapper.end())
+		{
+			labelMapper.insert(make_pair(v1[i], newLabel));
+			y = newLabel;
+			newLabel++;
+			
+		}
+		else y = iter->second;
+		v1[i] = y;
+		
+	}
+	for(int i = 0; i < v2.size(); i++)
+	{
+		iter = labelMapper.find(v2[i]);
+		int y;
+		if (iter == labelMapper.end())
+		{
+			labelMapper.insert(make_pair(v2[i], newLabel));
+			y = newLabel;
+			newLabel++;
+		}
+		else y = iter->second;
+		v2[i] = y;
+	}
+	labelMapper.clear();
 
+}
 int main(int argc, char *argv[])
 {
 	/* set up server */	
@@ -85,21 +120,30 @@ int main(int argc, char *argv[])
 	i = 0;
 	for(; i < graphDB.size();i++)
 	{
-		graph g = graphDB[i];
 		for(j = 0; j < queryDB.size(); j++)
 		{
+			graph g = graphDB[i];
 			graph q = queryDB[j]; 
-			if(ub == -1)  bound = max(g.v, q.v) + g.e + q.e;
-			else bound = ub;
-			BSEditDistance ed(width);
-			int ged = ed.getEditDistance(q, g, bound);
+			if (q.graph_id == g.graph_id)
+			{
+				cout << 0 << endl;
+			}
+			else
+			{
+				if(ub == -1)  bound = max(g.v, q.v) + g.e + q.e;
+				else bound = ub;
+				BSEditDistance ed(width);
+				changeLabel(g.V, q.V);
+	//		cout << g.graph_id << ' ' << q.graph_id << endl;
+				int ged = ed.getEditDistance(q, g, bound);
 //			if(ged > -1) 
 //			{
 //				cout << g.graph_id << " " << q.graph_id << " " << ged << endl; 
 //				sum++;
 //			}
-			cout << ged << endl;
-			FLAG = true;
+				cout << ged << endl;
+				FLAG = true;
+			}
 		}
 	}
 	

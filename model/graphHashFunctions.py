@@ -411,6 +411,7 @@ class GraphHash_Emb_Code(Model):
                                  output_dim=self.output_dim,
                                  placeholders=self.placeholders,
                                  act=lambda x: x,
+#                                 act=tf.nn.tanh,
                                  bias=True,
                                  dropout=FLAGS.dropout>0,
                                  logging=self.logging))
@@ -514,7 +515,7 @@ class GraphHash_Emb_Code(Model):
         self.pred = pred
         self.lab = lab
         self.code_mse_loss = code_mse_loss
-        self.emb_mse_loss = emb_mse_loss
+        ###self.emb_mse_loss = emb_mse_loss
 
         self.loss += FLAGS.binary_regularizer_weight*\
                     binary_regularizer(self.outputs[0])
@@ -527,17 +528,17 @@ class GraphHash_Emb_Code(Model):
         
     def getGEDByCode(self, code1, code2):
         return np.sum((code1-code2)**2)
-    
-""" This model is for binary label """
-class GraphHash_Emb_Code_Binary(GraphHash_Emb_Code):
-#    def __init__(self, placeholders, input_dim, next_ele, **kwargs):
-#        super(GraphHash_Emb_Code, self).__init__(placeholders, input_dim, next_ele, **kwargs)
+   
+class GraphHash_Emb_Code_Mapper(GraphHash_Emb_Code):
+    def __init__(self, placeholders, input_dim, next_ele, mapper, **kwargs):
+
+        self.mapper = mapper
+        super(GraphHash_Emb_Code_Mapper, self).__init__(placeholders, input_dim, next_ele, **kwargs)
 
 
-
+        
     def _loss(self):
-        self.loss = 0
-
+        # Weight decay loss
         for layer_type in self.layers:
             for layer in layer_type:
                 for var in layer.vars.values():
@@ -547,15 +548,33 @@ class GraphHash_Emb_Code_Binary(GraphHash_Emb_Code):
                               self.labels, 
                               self.gen_labels)
 
+        # Change label according to percentile
+        disc_labels = tf.identity(self.labels)
+        disc_gen_labels = tf.identity(self.gen_labels)
+        for i in range(FLAGS.GED_threshold):
+            disc_labels = tf.where(tf.abs(self.labels-i)<0.5, 
+                                   self.mapper(i) * tf.ones(tf.shape(disc_labels)), 
+                                   disc_labels)
+            disc_gen_labels = tf.where(tf.abs(self.gen_labels-i)<0.5, 
+                                   self.mapper(i) * tf.ones(tf.shape(disc_gen_labels)), 
+                                   disc_gen_labels)
 
-        code_mse_loss, pred, lab = DSH_Loss(self.outputs[0], 
-                                            self.labels)
 
-        self.loss = self.loss + code_mse_loss + emb_mse_loss
+
+        code_mse_loss, pred, lab = MSE_Loss(self.outputs[0], 
+                                            disc_labels,
+                                            disc_gen_labels)
+                                            #self.labels, 
+                                            #self.gen_labels)
+
+        self.loss = self.loss + code_mse_loss * FLAGS.code_mse_w
+        self.loss = self.loss + emb_mse_loss * FLAGS.emb_mse_w
         self.pred = pred
         self.lab = lab
         self.code_mse_loss = code_mse_loss
         self.emb_mse_loss = emb_mse_loss
 
-        self.loss = self.loss+FLAGS.binary_regularizer_weight*\
+        self.loss += FLAGS.binary_regularizer_weight*\
                     binary_regularizer(self.outputs[0])
+
+

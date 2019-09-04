@@ -1,0 +1,151 @@
+g++ -c -O3 -std=c++0x -D_FILE_OFFSET_BITS=64 -D_LARGE_FILE  global.cpp
+In file included from bitmap.h:4:0,
+                 from global.h:3,
+                 from global.cpp:1:
+stdafx.h:69:2: warning: ‘typedef’ was ignored in this declaration
+ };
+  ^
+In file included from global.h:3:0,
+                 from global.cpp:1:
+bitmap.h:11:2: warning: ‘typedef’ was ignored in this declaration
+ };
+  ^
+In file included from global.h:4:0,
+                 from global.cpp:1:
+verifyGraph.h: In member function ‘void verifyGraph::init(graph&)’:
+verifyGraph.h:71:44: warning: left shift count >= width of type [-Wshift-count-overflow]
+    else this->unMappedVertex[i] = (1ULL << 64) - 1;
+                                            ^
+global.cpp: At global scope:
+global.cpp:3:12: warning: ‘max_v_1’ initialized and declared ‘extern’
+ extern int max_v_1 = 0;
+            ^
+global.cpp:4:12: warning: ‘max_e_1’ initialized and declared ‘extern’
+ extern int max_e_1 = 0;
+            ^
+global.cpp:5:12: warning: ‘max_v_2’ initialized and declared ‘extern’
+ extern int max_v_2 = 0;
+            ^
+global.cpp:6:12: warning: ‘max_e_2’ initialized and declared ‘extern’
+ extern int max_e_2 = 0;
+            ^
+global.cpp:7:12: warning: ‘max_d_1’ initialized and declared ‘extern’
+ extern int max_d_1 = 0;
+            ^
+global.cpp:8:12: warning: ‘max_d_2’ initialized and declared ‘extern’
+ extern int max_d_2 = 0;
+            ^
+global.cpp:10:38: warning: ‘adjList1’ initialized and declared ‘extern’
+ extern vector<vector<int > > adjList1(0, vector<int>());
+                                      ^
+global.cpp:11:38: warning: ‘adjList2’ initialized and declared ‘extern’
+ extern vector<vector<int > > adjList2(0, vector<int>());
+                                      ^
+global.cpp:12:31: warning: ‘gn1’ initialized and declared ‘extern’
+ extern verifyGraphNode gn1[512] = { verifyGraphNode() };
+                               ^
+global.cpp:13:31: warning: ‘gn2’ initialized and declared ‘extern’
+ extern verifyGraphNode gn2[512] = { verifyGraphNode() };
+                               ^
+global.cpp:14:22: warning: ‘a1’ initialized and declared ‘extern’
+ extern u8 a1[512][512] = {0}; //
+                      ^
+global.cpp:15:22: warning: ‘a2’ initialized and declared ‘extern’
+ extern u8 a2[512][512] = {0};
+                      ^
+global.cpp:16:23: warning: ‘vs1’ initialized and declared ‘extern’
+ extern vector<int> vs1(0, 0);
+                       ^
+global.cpp:17:23: warning: ‘vs2’ initialized and declared ‘extern’
+ extern vector<int> vs2(0, 0);
+                       ^
+global.cpp:18:26: warning: ‘group1’ initialized and declared ‘extern’
+ extern vector<int> group1(0, 0);
+                          ^
+global.cpp:19:26: warning: ‘group2’ initialized and declared ‘extern’
+ extern vector<int> group2(0, 0);
+                          ^
+global.cpp:21:27: warning: ‘start_deleted’ initialized and declared ‘extern’
+ extern u8 start_deleted[64] = {0};
+                           ^
+global.cpp:22:25: warning: ‘end_deleted’ initialized and declared ‘extern’
+ extern u8 end_deleted[64] = {0};
+                         ^
+global.cpp:23:24: warning: ‘tmpDegree1’ initialized and declared ‘extern’
+ extern u8 tmpDegree1[64] ={0};
+                        ^
+global.cpp:23:24: error: conflicting declaration ‘u8 tmpDegree1 [64]’
+In file included from global.cpp:1:0:
+global.h:26:11: note: previous declaration as ‘u8 tmpDegree1 [512]’
+ extern u8 tmpDegree1[512];
+           ^
+global.cpp:24:24: warning: ‘tmpDegree2’ initialized and declared ‘extern’
+ extern u8 tmpDegree2[64] = {0};
+                        ^
+global.cpp:24:24: error: conflicting declaration ‘u8 tmpDegree2 [64]’
+In file included from global.cpp:1:0:
+global.h:27:11: note: previous declaration as ‘u8 tmpDegree2 [512]’
+ extern u8 tmpDegree2[512];
+           ^
+global.cpp:25:23: warning: ‘edgeList1’ initialized and declared ‘extern’
+ extern u8 edgeList1[64] = {0};
+                       ^
+global.cpp:26:23: warning: ‘edgeList2’ initialized and declared ‘extern’
+ extern u8 edgeList2[64] = {0};
+                       ^
+global.cpp:27:25: warning: ‘edge_set_1’ initialized and declared ‘extern’
+ extern u8 edge_set_1[512] = {0};
+                         ^
+global.cpp:28:25: warning: ‘edge_set_2’ initialized and declared ‘extern’
+ extern u8 edge_set_2[512] = {0};
+                         ^
+global.cpp:29:28: warning: ‘succ_degree_1’ initialized and declared ‘extern’
+ extern u8 succ_degree_1[512] = {0};
+                            ^
+global.cpp:30:28: warning: ‘succ_degree_2’ initialized and declared ‘extern’
+ extern u8 succ_degree_2[512] = {0};
+                            ^
+global.cpp:31:19: warning: ‘ds1’ initialized and declared ‘extern’
+ extern int ds1[512] = {0};
+                   ^
+global.cpp:32:19: warning: ‘ds2’ initialized and declared ‘extern’
+ extern int ds2[512] = {0};
+                   ^
+global.cpp:34:27: warning: ‘groupFlag1’ initialized and declared ‘extern’
+ extern bool groupFlag1[512] = {0};
+                           ^
+global.cpp:35:27: warning: ‘groupFlag2’ initialized and declared ‘extern’
+ extern bool groupFlag2[512] = {0};
+                           ^
+global.cpp:36:12: warning: ‘groupNumber’ initialized and declared ‘extern’
+ extern int groupNumber = 0;
+            ^
+global.cpp:37:27: warning: ‘unionFlag1’ initialized and declared ‘extern’
+ extern bool unionFlag1[512] = {0};
+                           ^
+global.cpp:38:27: warning: ‘unionFlag2’ initialized and declared ‘extern’
+ extern bool unionFlag2[512] = {0};
+                           ^
+global.cpp:40:13: warning: ‘FLAG’ initialized and declared ‘extern’
+ extern bool FLAG = true;
+             ^
+global.cpp:41:13: warning: ‘VERTEXFLAG1’ initialized and declared ‘extern’
+ extern bool VERTEXFLAG1 = false;
+             ^
+global.cpp:42:13: warning: ‘VERTEXFLAG2’ initialized and declared ‘extern’
+ extern bool VERTEXFLAG2 = false;
+             ^
+global.cpp:45:12: warning: ‘total_1’ initialized and declared ‘extern’
+ extern u64 total_1 = 0;
+            ^
+global.cpp:46:12: warning: ‘total_2’ initialized and declared ‘extern’
+ extern u64 total_2 = 0;
+            ^
+global.cpp:47:12: warning: ‘totalExpandNode’ initialized and declared ‘extern’
+ extern u64 totalExpandNode = 0;
+            ^
+global.cpp:48:12: warning: ‘total_search_node’ initialized and declared ‘extern’
+ extern u64 total_search_node = 0;
+            ^
+makefile:17: recipe for target 'global.o' failed
+make: *** [global.o] Error 1

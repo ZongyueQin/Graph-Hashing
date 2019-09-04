@@ -160,6 +160,12 @@ def tupleCode2IntegerCode(code):
         
     return int(ret)
 
+def writeMapperDict(mapper_dict, fname):
+    f = open(fname, 'w')
+    for i in range(FLAGS.GED_threshold):
+        f.write(str(max(mapper_dict[i]))+'\n')
+    f.close()
+
 def writeInvertedIndex(filename, index, embLen = FLAGS.hash_code_len):
     f = open(filename, 'w')
     f.write(str(len(index.keys()))+'\n')

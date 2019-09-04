@@ -5,7 +5,7 @@ import os
 import random
 
 from utils import *
-from graphHashFunctions import GraphHash_Emb_Code
+from graphHashFunctions import GraphHash_Emb_Code_Mapper, GraphHash_Emb_Code
 from config import FLAGS
 from DataFetcher import DataFetcher
 
@@ -30,9 +30,11 @@ placeholders = {
 thres = np.zeros(FLAGS.hash_code_len)
 
 # Create Model
-model = GraphHash_Emb_Code(placeholders, 
+#model = GraphHash_Emb_Code_Mapper(placeholders, 
+model = GraphHash_Emb_Code(placeholders,
                            input_dim=data_fetcher.get_node_feature_dim(),
                            next_ele = None,
+#                           mapper=None,
                            logging=True)
 
 # Initialize session

@@ -4,7 +4,7 @@ DIR_OBJ = ./obj
 DIR_BIN = ./bin
 
 cflags=-I/usr/include/python3.5m -I/usr/include/python3.5m  -Wno-unused-result -Wsign-compare -g -fstack-protector-strong -Wformat -Werror=format-security  -DNDEBUG -g -fwrapv -O3 -Wall -Wstrict-prototypes
-ldflags=-L/usr/lib/python3.5/config-3.5m-x86_64-linux-gnu -L/usr/lib -lpython3.5m -lpthread -ldl  -lutil -lm  -Xlinker -export-dynamic -Wl,-O1 -Wl,-Bsymbolic-functions
+ldflags=-L/usr/lib/python3.5/config-3.5m-x86_64-linux-gnu -L/usr/lib -lpython3.5m -lpthread -ldl  -lutil -lm  -Xlinker -export-dynamic -Wl,-O3 -Wl,-Bsymbolic-functions
 
 
 SRC = $(wildcard ${DIR_SRC}/*.cpp)  
@@ -19,6 +19,10 @@ CFLAGS = -std=c++0x -g -Wall -I${DIR_INC} -L$(DIR_OBJ) -D_FILE_OFFSET_BITS=64 -D
 
 ${BIN_TARGET}:${OBJ} main.cpp
 	$(CC) $(OBJ) main.cpp $(ldflags) $(cflags) $(CFLAGS) -o $@     
+
+${DIR_BIN}/topK:${OBJ} topK.cpp
+	$(CC) $(OBJ) topK.cpp $(ldflags) $(cflags) $(CFLAGS) -o $@     
+
 
 ${DIR_BIN}/test:${OBJ} test.cpp
 	$(CC) $(OBJ) test.cpp $(ldflags) $(cflags) $(CFLAGS) -o $@     

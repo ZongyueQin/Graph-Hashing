@@ -297,8 +297,9 @@ public:
 	inline int getEditDistance(graph &g1, graph &g2, int bound)
 	{
 
-		u8 lv_1[256], lv_2[256], le_1[64], le_2[64];
-		memset(lv_1, 0, 256 * sizeof(u8)); memset(lv_2, 0, 256 * sizeof(u8));
+		//cout << 'a' << endl;
+		u8 lv_1[30000], lv_2[30000], le_1[64], le_2[64];
+		memset(lv_1, 0, 30000 * sizeof(u8)); memset(lv_2, 0, 30000 * sizeof(u8));
 		memset(le_1, 0, 64 * sizeof(u8)); memset(le_2, 0, 64 * sizeof(u8));
 		max_v_1 = max_v_2 = max_e_1 = max_e_2 = 0;
 
@@ -320,7 +321,7 @@ public:
 			lv_1[g1.V[i]]++;
 		}
 		max_v_1++; max_e_1++;
-
+		//cout << 'b' << endl;
 		for (int i = 0; i < g2.v; i++)
 		{
 			for (int j = 0; j < g2.v; j++)
@@ -340,44 +341,55 @@ public:
 			lv_2[g2.V[i]]++;
 		}
 		max_v_2++; max_e_2++;
-
 		int commonVertex = common::initCommonLabel(lv_1, lv_2, max_v_1, max_v_2);
 		int commonEdge = common::initCommonLabel(le_1, le_2, max_e_1, max_e_2);
 		int lower_bound = max(g1.v, g2.v) - commonVertex + max(g1.e, g2.e) - commonEdge;
 		if (lower_bound > bound) return -1;
 
+		//cout << "cc" << endl;
 		int degree_1[1024], degree_2[1024];
 		g1.degreeSet(degree_1, max_d_1); max_d_1++;
 		g2.degreeSet(degree_2, max_d_2); max_d_2++;
+		//cout << max_d_1 << ' ' << max_d_2 << endl;
 		memset(tmpDegree1, 0, max_d_1 * sizeof(u8));
 		memset(tmpDegree2, 0, max_d_2 * sizeof(u8));
 		int i = 0, max1 = 0, max2 = 0, size1 = 0, size2 = 0, ie = 0, de = 0,
 			edge1 = g1.e, edge2 = g2.e;
-
+		//cout << "c1" << endl;
 		for (int i = 0; i < g1.v; i++)
 		{
 			if (max1 < degree_1[i])
 				max1 = degree_1[i];
 			tmpDegree1[degree_1[i]]++;
 		}
+		//cout << "c2" << endl;
 		for (i = max1; i >= 0; i--)
 		{
 			int len = tmpDegree1[i]; //chongdu
 			for (int l = 0; l < len; l++)
+			{
+				if (size1 >= 511) cout << "size1 >= 511" << endl;
 				ds1[size1++] = i;
+			}
 		}
+		//cout << "c3" << endl;
 		for (i = 0; i < g2.v; i++)
 		{
 			if (max2 < degree_2[i])
 				max2 = degree_2[i];
 			tmpDegree2[degree_2[i]]++;
 		}
+		//cout << "c4" << endl;
 		for (i = max2; i >= 0; i--)
 		{
 			int len = tmpDegree2[i];
 			for (int l = 0; l < len; l++)
+			{
+				if (size2 >= 512) cout << "size2 >= 512" << endl;
 				ds2[size2++] = i;
+			}
 		}
+		//cout << 'd' << endl;
 		common::degreeEditDistance(ds1, size1, ds2, size2, ie, de);
 		int tmp = max(2 * ie + edge1 - edge2, 2 * de + edge2 - edge1);
 		tmp = max(tmp, edge2 - commonEdge + de);
