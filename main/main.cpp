@@ -20,15 +20,16 @@ int main(int argc, char **argv)
 			 "inv_idx_txt [mapper_file]" << endl; 
 		exit(0);
 	}
-	string db_path = argv[1]; 
-	int totalGraph =  atoi(argv[2]);
-	string query = argv[3];
-	int totalQuery = atoi(argv[4]);
+	string db_path = argv[1]; // the bss file where data graphs are stored.
+	int totalGraph =  atoi(argv[2]); // how many graphs to read from @db_path
+	string query = argv[3]; // the bss file where query graphs are stored
+	int totalQuery = atoi(argv[4]); // how many queries to read from @query
 //	const int ub = atoi(argv[5]);
-	int width = atoi(argv[5]);
-	string model_path = argv[6];
+	int width = atoi(argv[5]); // the beam width used for BSS-GED, 
+                                   // recommend 15
+	string model_path = argv[6]; // .ckpt file to liad model
 
-	string invIdxTxtPath = argv[7];
+	string invIdxTxtPath = argv[7]; // .txt file to load inverted index
 
 	string GED2HammingFile = "";
 	if (argc == 9)
@@ -39,6 +40,7 @@ int main(int argc, char **argv)
 			totalGraph, CODELEN, GED2HammingFile);
 	
 	string query_out = query+"_ordered";
+        // Note BSS-GED need to call reOrderGraphs before call readGraphMemory
 	graph::reOrderGraphs(query.c_str(), query_out.c_str(), totalQuery);
 	vector<graph> queryDB = graph::readGraphMemory(query_out.c_str(), 
 							totalQuery);
@@ -51,12 +53,12 @@ int main(int argc, char **argv)
 	for(int ub = 0; ub < 6; ub++)
 	{
 		stringstream ss;
-		ss << "output/linux15_tanh_t=" << ub << "_" << OUTPUTFILE;
+		ss << "output/t=" << ub << "_" << OUTPUTFILE;
 		string outputFile = ss.str();
 		ofstream fout(outputFile);
 
 		stringstream ss2;
-		ss2 << "output/linux15_tanh_t=" << ub << "_" << "candidate.txt";
+		ss2 << "output/t=" << ub << "_" << "candidate.txt";
 		string candidateFile = ss2.str();
 		ofstream fout2(candidateFile);
 

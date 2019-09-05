@@ -30,12 +30,12 @@ from query import computeCSMTestMSEWithGroundTruth
 from query import rangeQueryCSM
 
 """ environment configuration """
-os.environ['CUDA_VISIBLE_DEVICES']='0,1'
+os.environ['CUDA_VISIBLE_DEVICES']='3,4'
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
 
-model_name = "0903_code_emb_k0_"+FLAGS.dataset
+model_name = "0904_code_emb_op1k5_"+FLAGS.dataset
 model_path = "SavedModel/"+model_name+".ckpt"
 saved_files_dir = "SavedModel"
 

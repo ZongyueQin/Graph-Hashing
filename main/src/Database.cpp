@@ -2,6 +2,7 @@
 
 using namespace std;
 
+/* Search Node class used when searching for possible codes */
 class SearchNode
 {
 public:
@@ -14,6 +15,7 @@ public:
 	}
 };
 
+/* Compute the L2 Distance between two embeddings */
 double dist(const GInfo &a, const GInfo &b, int embLen)
 {
 	double ret = 0;
@@ -25,6 +27,7 @@ double dist(const GInfo &a, const GInfo &b, int embLen)
 	return ret;
 }
 
+/* Search a code in a CodePos array, and return corresponding position */
 int BinarySearch(CodePos *array, int len, uint64_t code)
 {
 	int left = 0;
@@ -48,6 +51,7 @@ int BinarySearch(CodePos *array, int len, uint64_t code)
 	return -1;
 }
 
+/* Compute combination number (n,k) */
 uint64_t Combinations(unsigned int n, int k)
 {
      if (k > n)
@@ -66,6 +70,7 @@ uint64_t Combinations(unsigned int n, int k)
      return r;
 }
 
+/* Compute how many search nodes we need to explore */
 uint64_t computeSearchSpace(int codeLen, int thres)
 {
 	uint64_t ret = 0;
@@ -74,6 +79,7 @@ uint64_t computeSearchSpace(int codeLen, int thres)
 	return ret;
 }
 
+/* Compute hamming distance between two codes */
 uint64_t getHammingDistance(uint64_t a, uint64_t b, int len)
 {
 	uint64_t diff= a ^ b;
@@ -86,6 +92,8 @@ uint64_t getHammingDistance(uint64_t a, uint64_t b, int len)
 	return ret;
 }
 
+/* search a CodePos array to find all codes whose hamming distance to
+ * code is smaller than thres */
 // return is in res, the index (position) in Code2Pos
 void getAllValidCode(uint64_t code, int thres, 
 				int totalCodeCnt, int codeLen, 
@@ -137,6 +145,7 @@ void getAllValidCode(uint64_t code, int thres,
     
 } 
 
+/* A class used to define an order by a code's distance to a given code */
 class CompForTopK
 {
 public:
@@ -151,7 +160,7 @@ GInfo CompForTopK::qInfo = GInfo();
 int CompForTopK::embLen = 0;
 
 
-
+/* Search all embeddings and find top K nearest one */
 void getTopKByEmb(int K, int graphCnt, GInfo *gInfo, deque<uint64_t>& gid)
 {
 	priority_queue<GInfo, vector<GInfo>, CompForTopK> heap;
@@ -168,7 +177,7 @@ void getTopKByEmb(int K, int graphCnt, GInfo *gInfo, deque<uint64_t>& gid)
 	}
 }
 
-
+/* Search binary codes to find Top K nearest one */
 int getTopKByCode(int K, uint64_t code, int codeLen, int thres, int totalCodeCnt, 
             int totalGraphCnt, CodePos *index, vector<uint64_t> &res)
 {
@@ -227,9 +236,18 @@ int getTopKByCode(int K, uint64_t code, int codeLen, int thres, int totalCodeCnt
 }
 /**
  Construtor
- @param model_path: the path to load model
- @db: the path to load database graphs
- @graphNum: how many graphs to load
+ @param model_path: the path of xxxx.ckpt (see tensorflow's saver for details)
+                    used to load model. It should be generated automatically
+                    after you use TrainModel.py to train a model 
+ @param db: the path of a .bss file, it containes the data graphs, exact format see
+      graph::reOrderGraphs or graph::readGraphMemory
+ @param invIdex: the invertedIndex file in txt format, it should be generated 
+           automatically after training a model. see TrainModel.py for details
+ @param totalGraph: how many graphs to read from @db file
+ @param _codeLen: The length of codeLen, should be set to 32
+ @param GED2HammingFile: the mapping from GED to hamming distance, 
+                         default set to "". if is "" then the mapping is
+                         hamming = GED + 1. 
  */
 Database::Database(const string &modelPath, const string &db, 
 			const string &invIndex, 
@@ -373,6 +391,9 @@ Database::Database(const string &modelPath, const string &db,
 	cout << "Loading database done" << endl;
 }
 
+/* Call python to encode a query graph given qid, the correspnding query file
+ * should be read into DataFetcher in advance.
+ */
 bool
 Database::getCodeAndEmbByQidWithPython(const int qid, uint64_t &code, GInfo &qInfo)
 {
@@ -404,10 +425,9 @@ Database::getCodeAndEmbByQidWithPython(const int qid, uint64_t &code, GInfo &qIn
 	return true;
 }
 
-/**
- * Process Query identifeid by qid
- * @param qid: the graph id of query, should be loaded into data_fetcher in python
- * @param ret: into which the returned graph ids are inserted 
+
+/* Only get candidates, no verification. The meaning of parameters is same as
+ * those in Database::QueryProcess
  */
 bool
 Database::QueryProcessGetCandidate(const int qid, const int ub, const int width,
@@ -456,9 +476,19 @@ Database::QueryProcessGetCandidate(const int qid, const int ub, const int width,
 	return true;
 }
 /**
- * Process Query identifeid by qid
- * @param qid: the graph id of query, should be loaded into data_fetcher in python
+ * Process Query identifeid by qid, push final results into vector @ret, push 
+   filtered candidates into vector @candGid
+ * @param qid: the graph id of query, should be loaded into DataFetcher in python
+ * @param ub: the upbound of range query, i.e. we return graphs whose GED to 
+              the query graph is smaller or equal to ub.
+ * @param width: the beam width used by BSS-GED, recommend 15 or 50, depending
+                 on your memory capacity.
+ * @param fineGrained: if use continuous embedding to fine grain the candidates
+                       recommend set to true
+ * @pram q: the query graph, used by BSS-GED to compute exact GED.
  * @param ret: into which the returned graph ids are inserted 
+ * @param candGid: into which the candidates' ids are inserted
+ * @return: true if succeed, false otherwise.
  */
 bool
 Database::QueryProcess(const int qid, const int ub, const int width,
@@ -558,6 +588,7 @@ Database::QueryProcess(const int qid, const int ub, const int width,
 	return true;
 }
 
+/* used if the number of labels is too much*/
 void changeLabel(vector<int> &v1, vector<int> &v2)
 {
 	map<int, int> labelMapper;
@@ -594,6 +625,13 @@ void changeLabel(vector<int> &v1, vector<int> &v2)
 
 }
 
+/* Use BSS-GED to verify candidates
+ * @param query: the query graph
+ * @param candidates: the candidates graphs
+ * @param ub: the upbound of range query
+ * @param width: the beam width used by BSS-GED
+ * @param ret: the passed graphs' gids are inserted into ret
+ */
 bool 
 Database::Verify(const graph &query, const vector<graph> &candidates, 
 		 const int ub, const int width,
@@ -605,6 +643,7 @@ Database::Verify(const graph &query, const vector<graph> &candidates,
 	{
 		graph g = candidates[i];
 		graph q = query; 
+		// TODO see if label number it too much 
 //		changeLabel(q.V, g.V);
 		if(ub == -1)  bound = max(g.v, q.v) + g.e + q.e;
 		else bound = ub;
@@ -620,8 +659,12 @@ Database::Verify(const graph &query, const vector<graph> &candidates,
 	return true;
 }
 
+/* Use only codes and embeddings to find top-k query, but for now we don't 
+ * care about top-k query
+ */
 bool
-Database::topKQueryProcess(const int qid, const int K, vector<uint64_t> &ret, int thres)
+Database::topKQueryProcess(const int qid, const int K, vector<uint64_t> &ret, 
+                           int thres)
 {
 	/* get embedding and code */
 	GInfo qInfo;

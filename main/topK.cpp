@@ -48,7 +48,7 @@ int main(int argc, char **argv)
 	vector<uint64_t> result;
 
 	stringstream ss;
-	ss << "output/ALCHEMY_top" << K << "_" << OUTPUTFILE;
+	ss << "output/AIDS_k0_top" << K << "_" << OUTPUTFILE;
 	string outputFile = ss.str();
 	ofstream fout(outputFile);
 

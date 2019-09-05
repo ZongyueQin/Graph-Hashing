@@ -546,7 +546,7 @@ class DataFetcher:
         #    op_num = randint(1,7)#FLAGS.GED_threshold-2)
         #    if op_num  == 7:
         #        op_num = 1
-            op_num = randint(1,3)
+            op_num = randint(1,1)
             # though not accurate, may be good enough
             geds.append(op_num)
             j = 0

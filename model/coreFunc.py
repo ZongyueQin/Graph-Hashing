@@ -9,7 +9,7 @@ from graphHashFunctions import GraphHash_Emb_Code_Mapper, GraphHash_Emb_Code
 from config import FLAGS
 from DataFetcher import DataFetcher
 
-os.environ['CUDA_VISIBLE_DEVICES']='0,3'
+os.environ['CUDA_VISIBLE_DEVICES']='6,7'
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
