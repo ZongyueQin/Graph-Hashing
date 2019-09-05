@@ -4,10 +4,28 @@ flags = tf.app.flags
 FLAGS = flags.FLAGS
 
 #dataset related
-flags.DEFINE_string('dataset', 'linux15', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
+dataset = 'linux15'
+
+if dataset == 'linux15':
+    flags.DEFINE_string('dataset', 'linux15', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
+    flags.DEFINE_string('node_feat_encoder','constant_1','How to encode node feature')
+    flags.DEFINE_string('node_feat_name',None,'Name of node feature')
+elif dataset == 'ALCHEMY':
+    flags.DEFINE_string('dataset', 'ALCHEMY', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
+    flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
+    flags.DEFINE_string('node_feat_name','a_type','Name of node feature')
+elif dataset == 'AIDS'   
+    flags.DEFINE_string('dataset', 'AIDS', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
+    flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
+    flags.DEFINE_string('node_feat_name','type','Name of node feature')
+else:
+    # You should define your own corresponding attributes here
+    flags.DEFINE_string('dataset', 'AIDS', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
+    flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
+    flags.DEFINE_string('node_feat_name','type','Name of node feature')
+
+
 flags.DEFINE_string('ground_truth_file', 'GT11.txt', 'ground truth file, should be in test directory')
-flags.DEFINE_string('node_feat_encoder','constant_1','How to encode node feature')
-flags.DEFINE_string('node_feat_name',None,'Name of node feature')
 flags.DEFINE_string('node_label_name', 'label', 'Name of node label, none if it\'s idx')
 flags.DEFINE_boolean('clip', True, 'clip GED beyond GED_threshold')
 
