@@ -23,11 +23,11 @@ from config import FLAGS
 from DataFetcher import DataFetcher
 import pickle
 from train import train_model, train_GH_CSM
-from query import computeTrainingMSE, computeTestMSEWithoutGroundTruth
-from query import computeTestMSEWithGroundTruth
-from query import topKQuery, rangeQuery
-from query import computeCSMTestMSEWithGroundTruth
-from query import rangeQueryCSM
+#from query import computeTrainingMSE, computeTestMSEWithoutGroundTruth
+#from query import computeTestMSEWithGroundTruth
+#from query import topKQuery, rangeQuery
+#from query import computeCSMTestMSEWithGroundTruth
+#from query import rangeQueryCSM
 
 """ environment configuration """
 os.environ['CUDA_VISIBLE_DEVICES']='3,4'
@@ -35,7 +35,7 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
 
-model_name = "0904_code_emb_op1k5_"+FLAGS.dataset
+model_name = "0908_code_emb_ES_"+FLAGS.dataset
 model_path = "SavedModel/"+model_name+".ckpt"
 saved_files_dir = "SavedModel"
 

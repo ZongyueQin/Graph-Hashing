@@ -7,16 +7,18 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import time
 from config import FLAGS
-from CSM_config import CSM_FLAGS
+#from CSM_config import CSM_FLAGS
 from utils import *
-from CSM_train import run_tf
-from utils_siamese import convert_msec_to_sec_str
+#from CSM_train import run_tf
+#from utils_siamese import convert_msec_to_sec_str
 
 def train_model(sess, model, saver, placeholders, data_fetcher, 
                 save_path = "SavedModel/model_rank.ckpt"):
     print('start optimization...')
     sess.run(tf.global_variables_initializer())
     train_start = time.time()
+    last_large_range_losses = []
+    last_small_range_losses = []
     train_losses = []
     for epoch in range(FLAGS.epochs):
     
@@ -27,10 +29,17 @@ def train_model(sess, model, saver, placeholders, data_fetcher,
         # Training step
         outs = sess.run([model.opt_op, model.loss], feed_dict=feed_dict)
         train_losses.append(outs[1])
-        if (epoch+1) % 100 == 0:
-            pred,lab = sess.run([model.pred, model.lab], feed_dict=feed_dict)
-            print(pred)
-            print(lab)
+        last_large_range_losses.append(outs[1])
+        if len(last_large_range_losses) > FLAGS.early_stopping_large_range:
+            last_large_range_losses.pop(0)
+        last_small_range_losses.append(outs[1])
+        if len(last_small_range_losses) > FLAGS.early_stopping_small_range:
+            last_small_range_losses.pop(0)
+
+#        if (epoch+1) % 100 == 0:
+#            pred,lab = sess.run([model.pred, model.lab], feed_dict=feed_dict)
+#            print(pred)
+#            print(lab)
     
         # No Validation For Now
 
@@ -38,9 +47,10 @@ def train_model(sess, model, saver, placeholders, data_fetcher,
         print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(outs[1]), 
               "time=", "{:.5f}".format(time.time() - t))
 
-#    if epoch > FLAGS.early_stopping and cost_val[-1] > np.mean(cost_val[-(FLAGS.early_stopping+1):-1]):
-#        print("Early stopping...")
-#        break
+        if epoch > FLAGS.early_stopping_large_range and epoch % FLAGS.early_stopping_check_frequency == 0:
+            if np.mean(last_large_range_losses)-np.mean(last_small_range_losses) < FLAGS.early_stopping_thres:
+                print("Early stopping...")
+                break
     plt.plot(train_losses)
     plt.xlabel('iterations')
     plt.ylabel('training loss')
