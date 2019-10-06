@@ -25,20 +25,20 @@ linux15 | bin/main ../data/linux15/train/graphs.bss 24087 ../data/linux15/test/g
 ALCHEMY | bin/main ../data/ALCHEMY/train/graphs.bss 99676 ../data/ALCHEMY/test/graphs.bss 100 15 model_path inverted_index_path (GED2Hamming mapping file)
 
 ## Dependecies
-*python3: Assume python3 by default (use pip3 to install packages).
-*numpy
-*pandas
-*scipy
-*scikit-learn
-*tensorflow
-*networkx==1.11 (NOT 2.1)
-*beautifulsoup4
-*lxml
-*matplotlib
-*seaborn
-*colour
-*pytz
-*requests
+* python3: Assume python3 by default (use pip3 to install packages).
+* numpy
+* pandas
+* scipy
+* scikit-learn
+* tensorflow
+* networkx==1.11 (NOT 2.1)
+* beautifulsoup4
+* lxml
+* matplotlib
+* seaborn
+* colour
+* pytz
+* requests
 
 Reference commands: sudo pip3 install numpy pandas scipy scikit-learn tensorflow networkx==1.10 beautifulsoup4 lxml matplotlib seaborn colour pytz requests
 
