@@ -13,12 +13,15 @@ os.environ['CUDA_VISIBLE_DEVICES']='6,7'
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
+
 """ Load datafetcher only to get node_feature_dim, probably should use more efficient way to do that in future """
 data_fetcher = DataFetcher(dataset=FLAGS.dataset, exact_ged=True)
+node_feature_dim = data_fetcher.get_node_feature_dim()
+del data_fetcher
 # Define placeholders
 placeholders = {
     'support': tf.sparse_placeholder(tf.float32),
-    'features': tf.sparse_placeholder(tf.float32, shape=(None, data_fetcher.get_node_feature_dim())),
+    'features': tf.sparse_placeholder(tf.float32, shape=(None, node_feature_dim)),
 #    'labels': tf.placeholder(tf.float32, shape=(FLAGS.batchsize, FLAGS.batchsize)),
     'dropout': tf.placeholder_with_default(0., shape=()),
     'graph_sizes': tf.placeholder(tf.int32, shape=(1)),
@@ -32,7 +35,7 @@ thres = np.zeros(FLAGS.hash_code_len)
 # Create Model
 #model = GraphHash_Emb_Code_Mapper(placeholders, 
 model = GraphHash_Emb_Code(placeholders,
-                           input_dim=data_fetcher.get_node_feature_dim(),
+                           input_dim=node_feature_dim,
                            next_ele = None,
 #                           mapper=None,
                            logging=True)

@@ -4,7 +4,7 @@ flags = tf.app.flags
 FLAGS = flags.FLAGS
 
 #dataset related
-dataset = 'ALCHEMY'
+dataset = 'ER'
 
 if dataset == 'linux15':
     flags.DEFINE_string('dataset', 'linux15', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
@@ -18,9 +18,13 @@ elif dataset == 'AIDS':
     flags.DEFINE_string('dataset', 'AIDS', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
     flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
     flags.DEFINE_string('node_feat_name','type','Name of node feature')
+elif dataset == 'FULL_ALCHEMY':
+    flags.DEFINE_string('dataset', 'FULL_ALCHEMY', 'Dataset string')
+    flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
+    flags.DEFINE_string('node_feat_name','atom','Name of node feature')
 else:
     # You should define your own corresponding attributes here
-    flags.DEFINE_string('dataset', 'AIDS', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
+    flags.DEFINE_string('dataset', 'Syn-ER', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
     flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
     flags.DEFINE_string('node_feat_name','type','Name of node feature')
 
@@ -71,7 +75,7 @@ flags.DEFINE_float('valid_percentage', 0, 'percentage of validation set')
 flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate.')
 flags.DEFINE_integer('epochs', 15000, 'Number of epochs to train.')
 flags.DEFINE_integer('early_stopping_large_range', 500, '')
-flags.DEFINE_integer('early_stopping_small_range', 100, '')
+flags.DEFINE_integer('early_stopping_small_range', 50, '')
 flags.DEFINE_integer('early_stopping_check_frequency', 50, '')
 flags.DEFINE_float('early_stopping_thres', 0.1, '')
 flags.DEFINE_integer('last_n', 5, 'last n loss is used to decide early stopping or not')

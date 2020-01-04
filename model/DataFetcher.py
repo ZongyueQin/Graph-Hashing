@@ -63,6 +63,8 @@ class DataFetcher:
         self.cur_valid_sample_ptr = 0
         self.cur_test_sample_ptr = 0
 
+        self.node_feature_dim = self.train_graphs[0].spare_node_inputs.shape[1]
+
 
     def getGraphByGid(self, gid):
         return self.gid2graph[gid]
@@ -94,7 +96,7 @@ class DataFetcher:
     def get_node_feature_dim(self):
         if len(self.train_graphs) == 0:
             raise RuntimeError('train_graphs is empty, can\'t get feature dim')
-        return self.train_graphs[0].sparse_node_inputs.shape[1]
+        return self.node_feature_dim #self.train_graphs[0].sparse_node_inputs.shape[1]
 
     def get_train_data(self):
         for i in range(FLAGS.epochs*2):
