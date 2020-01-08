@@ -4,7 +4,7 @@ flags = tf.app.flags
 FLAGS = flags.FLAGS
 
 #dataset related
-dataset = 'FULL_ALCHEMY'
+dataset = 'linux15'
 
 if dataset == 'linux15':
     flags.DEFINE_string('dataset', 'linux15', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
@@ -32,7 +32,7 @@ else:
     flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
     flags.DEFINE_string('node_feat_name','type','Name of node feature')
 
-flags.DEFINE_string('bit_weight_type', 'const', 'type of bit weight type, const, log, exp or var')
+flags.DEFINE_string('bit_weight_type', 'var', 'type of bit weight type, const, log, exp or var')
 
 flags.DEFINE_string('ground_truth_file', 'GT11.txt', 'ground truth file, should be in test directory')
 flags.DEFINE_string('node_label_name', 'label', 'Name of node label, none if it\'s idx')

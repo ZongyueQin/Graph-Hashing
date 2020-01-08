@@ -457,11 +457,11 @@ class GraphHash_Emb_Code(Model):
                 with tf.variable_scope(self.name+'_bit_weights'):
                     self.bit_weights = ones([FLAGS.hash_code_len],name='bit_weights')
         elif FLAGS.bit_weight_type == 'log':
-            self.bit_weights = tf.consant([np.log(i) for i in FLAGS.hash_code_len], dtype=tf.float32)
+            self.bit_weights = tf.constant([np.log(i) for i in range(FLAGS.hash_code_len)], dtype=tf.float32)
         elif FLAGS.bit_weight_type == 'exp':
-            self.bit_weights = tf.consant([2**i for i in FLAGS.hash_code_len], dtype=tf.float32)
+            self.bit_weights = tf.constant([2**i for i in range(FLAGS.hash_code_len)], dtype=tf.float32)
         elif FLAGS.bit_weight_type == 'const':
-            self.bit_weights = tf.consant([1 for i in FLAGS.hash_code_len], dtype=tf.float32)
+            self.bit_weights = tf.constant([1 for i in range(FLAGS.hash_code_len)], dtype=tf.float32)
         else:
             raise RuntimeError('Unrecognized Bit Weight Type: '+FLAGS.bit_weight_type)
 

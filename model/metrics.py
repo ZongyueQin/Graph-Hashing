@@ -118,7 +118,7 @@ def MSE_Loss(codes, label_1, label_2, bit_weights=None):
         M2 = tf.stack([diag for i in range(bs)])
     else:
         D = tf.nn.relu(tf.matrix_diag(bit_weights))
-        M1 = tf.matmul(tf.matmul(A1, D)， tf.transpose(A1)) # M1 = A1@D@A1.T
+        M1 = tf.matmul(tf.matmul(A1, D), tf.transpose(A1)) # M1 = A1@D@A1.T
         diag = tf.squeeze(tf.matrix_diag_part(M1))
         M2 = tf.stack([diag for i in range(bs)])
 
@@ -139,8 +139,8 @@ def MSE_Loss(codes, label_1, label_2, bit_weights=None):
             pred_2 = tf.reduce_sum((A2-A3)**2, axis=2) 
         else:
             W_1 = tf.stack([bit_weights for i in range(k)], axis=0)
-            W = tf.nn.relu(tf.stack([W_1 for i in range(bs), axis=0]))
-            pred2 = tf.reduce_sum(W*(A2-A3)**2, axis=2)
+            W = tf.nn.relu(tf.stack([W_1 for i in range(bs)], axis=0))
+            pred_2 = tf.reduce_sum(W*(A2-A3)**2, axis=2)
 
         pred_2 = tf.clip_by_value(pred_2, 0, FLAGS.GED_threshold)
         loss_mat_2 = (label_2 - pred_2)**2
