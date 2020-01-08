@@ -21,13 +21,16 @@ import xml
 from nx_to_gxl import nx_to_gxl
 from config import FLAGS
 from utils import sorted_nicely
+from MyGraph import *
 
 class DataFetcher:
     """ Represents a set of data """
     
     """ read training graphs and test graphs """
-    def __init__(self, dataset, exact_ged = False, label_transform = lambda x: x):
-        
+    def __init__(self, dataset, max_graph_num = 1000000,
+                 exact_ged = False, wrp_train_graph = True,
+                 label_transform = lambda x: x):
+        self.max_graph_num = 1000000
         self.exact_ged = exact_ged
         self.label_transform = label_transform
         # a helper object to map features to consecutive integer
@@ -54,17 +57,27 @@ class DataFetcher:
 
         self.gid2graph = {}
 
-        self.train_graphs = self.create_wrapper_graph(train_graphs, 'train')
+        if wrp_train_graph == True:
+            self.train_graphs = self.create_wrapper_graph(train_graphs, 'train')
+            self.train_graphs, self.valid_graphs = self._split_train_valid(self.train_graphs)
+        else:
+            self.train_graphs = []
+
         self.test_graphs = self.create_wrapper_graph(test_graphs, 'test')
         
-        self.train_graphs, self.valid_graphs = self._split_train_valid(self.train_graphs)
         # pointers help to sample graphs
         self.cur_train_sample_ptr = 0
         self.cur_valid_sample_ptr = 0
         self.cur_test_sample_ptr = 0
 
-        self.node_feature_dim = self.train_graphs[0].spare_node_inputs.shape[1]
-
+        if len(self.test_graphs) > 0:
+            #raise RuntimeError('train_graphs is empty, can\'t get feature dim')
+            self.node_feature_dim = self.test_graphs[0].sparse_node_inputs.shape[1]
+        elif len(self.train_graphs) > 0:
+            self.node_feature_dim = self.train_graphs[0].sparse_node_inputs.shape[1]
+        else:
+            raise RuntimeError('train_graphs is empty, can\'t get feature dim')
+ 
 
     def getGraphByGid(self, gid):
         return self.gid2graph[gid]
@@ -94,8 +107,6 @@ class DataFetcher:
 
     """ return dimension of features """
     def get_node_feature_dim(self):
-        if len(self.train_graphs) == 0:
-            raise RuntimeError('train_graphs is empty, can\'t get feature dim')
         return self.node_feature_dim #self.train_graphs[0].sparse_node_inputs.shape[1]
 
     def get_train_data(self):
@@ -255,6 +266,9 @@ class DataFetcher:
         graphs = []
         err_cnt = 0
         for file in sorted_nicely(glob(graph_dir+'/*.gexf')):
+            if len(graphs) >= self.max_graph_num:
+                print('reach maximal graph num: %d'%self.max_graph_num)
+                break
             if len(graphs) % 1000 == 0:
                 print('finished {:d} files'.format(len(graphs)))
             gid = int(os.path.basename(file).split('.')[0])
@@ -678,107 +692,3 @@ class DataFetcher:
         g.remove_node(n)
         return
 
-"""------------------------------------------------------------------------"""
-        
-     
-""" My wrapper object for networkx graph 
-    Parts of the code refer to https://github.com/tkipf/gcn """
-class MyGraph(object):
-    
-    def __init__(self, nxgraph, node_feat_encoder):
-        self.nxgraph = nxgraph
-        adj_mat = nx.to_scipy_sparse_matrix(nxgraph)
-        dense_node_inputs = node_feat_encoder.encode(nxgraph)
-        # TODO probably add ordering
-        
-        self.sparse_node_inputs = self._preprocess_inputs(
-                sp.csr_matrix(dense_node_inputs))
-        
-        self.laplacian = self._preprocess_adj(adj_mat)
-    
-        
-    def _preprocess_inputs(self, inputs):
-        """Row-normalize feature matrix and convert to tuple representation"""
-        rowsum = np.array(inputs.sum(1))
-        r_inv = np.power(rowsum, -1).flatten()
-        r_inv[np.isinf(r_inv)] = 0.
-        r_mat_inv = sp.diags(r_inv)
-        inputs = r_mat_inv.dot(inputs)
-        return inputs
-#        return self._sparse_to_tuple(inputs)
-
-    
-    """ compute laplacian matrix, return a sparse matrix in form of tuple """
-    def _preprocess_adj(self, adj_mat):
-        adj_proc = sp.coo_matrix(adj_mat+sp.eye(adj_mat.shape[0]))
-        if FLAGS.laplacian == 'gcn': # what's other options ?
-            adj_proc = self._normalize_adj(adj_proc)
-        
-        return adj_proc
-#        return self._sparse_to_tuple(adj_proc)
-    
-    """ Symmetrically normalize matrix """
-    def _normalize_adj(self, adj):
-        rowsum = np.array(adj.sum(1))
-        d_inv_sqrt = np.power(rowsum, -0.5).flatten()
-        d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.
-        d_mat_inv_sqrt = sp.diags(d_inv_sqrt)
-        return adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo()
-
-
-class NodeFeatureEncoder(object):
-    def encode(self, g):
-        raise NotImplementedError()
-
-    def input_dim(self):
-        raise NotImplementedError()
-
-
-class NodeFeatureOneHotEncoder(NodeFeatureEncoder):
-    def __init__(self, gs, node_feat_name):
-        self.node_feat_name = node_feat_name
-        # Go through all the graphs in the entire dataset
-        # and create a set of all possible
-        # labels so we can one-hot encode them.
-        inputs_set = set()
-        for g in gs:
-            inputs_set = inputs_set | set(self._node_feat_dic(g).values())
-        self.feat_idx_dic = {feat: idx for idx, feat in enumerate(sorted(list(inputs_set)))}
-        self._fit_onehotencoder()
-
-    def _fit_onehotencoder(self):
-        self.oe = OneHotEncoder().fit(
-            np.array(list(self.feat_idx_dic.values())).reshape(-1, 1))
-
-    def add_new_feature(self, feat_name):
-        """Use this function if a new feature was added to the graph set."""
-        # Add the new feature to the dictionary
-        # as a unique feature and reinit the encoder.
-        new_idx = len(self.feat_idx_dic)
-        self.feat_idx_dic[feat_name] = new_idx
-        self._fit_onehotencoder()
-
-    def encode(self, g):
-        node_feat_dic = self._node_feat_dic(g)
-        temp = [self.feat_idx_dic[node_feat_dic[n]] for n in g.nodes()]
-        return self.oe.transform(np.array(temp).reshape(-1, 1)).toarray()
-
-    def input_dim(self):
-        return self.oe.transform([[0]]).shape[1]
-
-    def _node_feat_dic(self, g):
-        return nx.get_node_attributes(g, self.node_feat_name)
-
-
-class NodeFeatureConstantEncoder(NodeFeatureEncoder):
-    def __init__(self, _, node_feat_name):
-        self.input_dim_ = int(FLAGS.node_feat_encoder.split('_')[1])
-        self.const = float(2.0)
-        assert (node_feat_name is None)
-
-    def encode(self, g):
-        rtn = np.full((g.number_of_nodes(), self.input_dim_), self.const)
-        return rtn
-
-    def input_dim(self):
-        return self.input_dim_

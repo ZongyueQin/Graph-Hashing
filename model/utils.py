@@ -1,6 +1,12 @@
 from config import FLAGS
+import os
 import numpy as np
 import tensorflow as tf
+import scipy.sparse as sp
+from MyGraph import MyGraph
+import networkx as nx
+from glob import glob
+import xml
 
 def construct_input(data):
     features = tf.SparseTensor(data[0],data[1],data[2])
@@ -281,4 +287,227 @@ def readGroundTruth(f):
     
 
             
+
+
+def encodeData(sess, model, data_fetcher, graphs, placeholders,use_emb,use_code,
+               inverted_index, id2emb, id2code):
+
+    encode_batchsize=FLAGS.ecd_batchsize
+    total_graph_num = len(graphs)
+    thres = np.zeros(FLAGS.hash_code_len)
+    all_codes = []
+    all_embs = []
+    
+
+    for i in range(0, total_graph_num, encode_batchsize):
+
+        end = i + encode_batchsize
+
+        if end > total_graph_num:
+
+            end = total_graph_num
+
+        idx_list = list(range(i,end))
+
+        # padding to fit placeholders' shapes
+
+        while (len(idx_list) < encode_batchsize):
+
+            idx_list.append(0)
+
         
+
+        # Create wrapper graphs
+
+        wrp_graphs = []
+
+        for j in idx_list:
+
+            mg = MyGraph(graphs[j], data_fetcher.node_feat_encoder)
+
+            wrp_graphs.append(mg)
+
+        
+
+        features = sp.vstack([g.sparse_node_inputs for g in wrp_graphs])
+
+        features = data_fetcher._sparse_to_tuple(features)
+
+        
+
+        laplacians = sp.block_diag([g.laplacian for g in wrp_graphs])
+
+        laplacians = data_fetcher._sparse_to_tuple(laplacians)
+
+        
+
+        sizes = [g.nxgraph.number_of_nodes() for g in wrp_graphs]
+
+        data_fetcher.batch_node_num = sum(sizes)
+
+                
+
+        feed_dict = dict()
+
+        #nfn = data_fetcher.get_node_feature_dim()
+
+        feed_dict.update({placeholders['dropout']: 0})
+
+        feed_dict.update({placeholders['features']: features})
+
+        feed_dict.update({placeholders['support']: laplacians})
+
+        #    feed_dict.update({placeholders['num_features_nonzero']: [data_fetcher.batch_node_num]})
+
+        feed_dict.update({placeholders['graph_sizes']: sizes})
+
+        feed_dict.update({placeholders['thres']: thres})
+
+        
+
+        if use_code and use_emb:
+
+            codes, embs = sess.run([model.codes,
+
+                                    model.ecd_embeddings], 
+
+                                    feed_dict = feed_dict)
+
+            codes = list(codes)
+
+            codes = codes[0:end-i]
+
+            all_codes = all_codes + codes
+
+    
+
+            embs = list(embs)
+
+            embs = embs[0:end-i]
+
+            all_embs = all_embs + embs
+
+    
+
+        elif use_code and use_emb == False:
+
+            codes = sess.run(model.codes, feed_dict=feed_dict)
+
+            codes = list(codes)
+
+            codes = codes[0:end-i]
+
+            all_codes = all_codes + codes
+
+            all_embs = all_codes
+
+        elif use_code == False and use_emb:
+
+            embs = sess.run(model.ecd_embeddings, feed_dict=feed_dict)
+
+            embs = list(embs)
+
+            embs = embs[0:end-i]
+
+            all_embs = all_embs + embs
+
+            all_codes = all_embs
+
+        else:
+
+            raise RuntimeError('use_code and use_emb cannot both be False')
+
+
+    for i, pair in enumerate(zip(all_codes, all_embs)):
+        code = pair[0]
+
+        emb = pair[1]
+
+        tuple_code = tuple(code)
+
+        gid = graphs[i].graph['gid']
+
+        if use_emb and use_code:
+
+            inverted_index.setdefault(tuple_code, [])
+
+            inverted_index[tuple_code].append((gid, emb))
+
+        if use_code and use_emb == False:
+
+            inverted_index.setdefault(tuple_code, [])
+
+            inverted_index[tuple_code].append((gid, None))            
+
+        if use_emb:
+
+            id2emb[gid] = emb
+
+        if use_code:
+
+            id2code[gid] = code    
+ 
+
+
+
+def encodeDataInDir(sess, model, data_fetcher, graph_dir, placeholders, 
+
+                    max_graph_in_mem=500000,
+
+                    use_emb=True,
+
+                    use_code=True):
+
+    print('Start encoding...')
+
+    graphs = []
+
+    err_cnt = 0
+
+    inverted_index = {}
+
+    #encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
+
+    thres = np.zeros(FLAGS.hash_code_len)
+    id2emb = {}
+    id2code = {}
+
+
+    
+
+    for file in sorted_nicely(glob(graph_dir+'/*.gexf')):
+
+        if len(graphs) >= max_graph_in_mem:
+            print('Reach maximal graph in memory, start encoding')
+            encodeData(sess, model, data_fetcher, graphs, placeholders,use_emb,
+                       use_code, 
+                       inverted_index, id2emb, id2code)
+            print('finish this batch')
+            graphs = []
+
+        gid = int(os.path.basename(file).split('.')[0])
+
+        try:
+
+            g = nx.read_gexf(file)
+
+        except xml.etree.ElementTree.ParseError:
+
+            print('err in nx.read_fexf', end = ' ')
+
+            print(file)
+
+            err_cnt = err_cnt + 1
+
+            continue
+
+        g.graph['gid'] = gid
+
+        graphs.append(g)
+
+    print('encode last batch')
+    encodeData(sess, model, data_fetcher, graphs, placeholders,use_emb,use_code,
+               inverted_index, id2emb, id2code)     
+
+    print('finish encoding training data') 
+    return inverted_index, id2emb, id2code

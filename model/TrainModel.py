@@ -30,12 +30,12 @@ from train import train_model, train_GH_CSM
 #from query import rangeQueryCSM
 
 """ environment configuration """
-os.environ['CUDA_VISIBLE_DEVICES']='3,4'
+os.environ['CUDA_VISIBLE_DEVICES']='3,2'
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
 
-model_name = "0908_code_emb_ES_"+FLAGS.dataset
+model_name = "0106:20:37_"+FLAGS.dataset
 model_path = "SavedModel/"+model_name+".ckpt"
 saved_files_dir = "SavedModel"
 
@@ -44,6 +44,7 @@ random_seed = 123
 np.random.seed(random_seed)
 tf.set_random_seed(random_seed)
 seed(random_seed)
+
 
 
 """ Create data fetcher """
@@ -80,7 +81,7 @@ placeholders = {
     'dropout': tf.placeholder_with_default(0., shape=()),
 #    'graph_sizes': tf.placeholder(tf.int32, shape=(FLAGS.batchsize*(1+FLAGS.k))),
 #    'graph_sizes': tf.placeholder(tf.int32, shape=(None)),
-    'graph_sizes': tf.placeholder(tf.int32, shape=(1)),
+    'graph_sizes': tf.placeholder(tf.int32, shape=(FLAGS.ecd_batchsize)),
     'generated_labels':tf.placeholder(tf.float32, shape=(FLAGS.batchsize, FLAGS.k)),
     'thres':tf.placeholder(tf.float32, shape=(FLAGS.hash_code_len))
 }
@@ -109,17 +110,21 @@ saver = tf.train.Saver()
 
 
 cost_val = []
-
+#sess.run(tf.global_variables_initializer())
 train_model(sess, model, saver, placeholders, data_fetcher, save_path=model_path)
 #    csm.train(sess, csm_saver)
 #model_path = "SavedModel/"+model_name+".ckpt"
 #saver.restore(sess, model_path)
  
 start_time = time.time()
-inverted_index, id2emb, id2code = encodeTrainingData(sess, model, 
-                                                     data_fetcher, 
-                                                     placeholders,
-                                                     True, True)
+#inverted_index, id2emb, id2code = encodeTrainingData(sess, model, 
+#                                                     data_fetcher, 
+#                                                     placeholders,
+#                                                     True, True)
+inverted_index, id2emb, id2code = encodeDataInDir(sess, model,
+                                                  data_fetcher,
+                                                  data_fetcher.train_data_dir,
+                                                  placeholders)
 print('encoding data, cost %.5f s'%(time.time()-start_time))
 
 index_file = open('SavedModel/inverted_index_'+model_name+'.pkl', 'wb')

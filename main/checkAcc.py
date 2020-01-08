@@ -78,6 +78,7 @@ if __name__ == '__main__':
     f1_scores_nz = []
 
     ret_size = []
+    intersect_size = []
 
     for q in ground_truth.keys():
 #        break
@@ -97,6 +98,7 @@ if __name__ == '__main__':
         real_sim_set = ground_truth[q]
         ret_size.append(len(similar_set))
         tmp = similar_set & real_sim_set
+        intersect_size.append(len(tmp))
         if len(similar_set) == 0:
             if len(real_sim_set) == 0:
                 precision = 1
@@ -114,6 +116,7 @@ if __name__ == '__main__':
             if len(similar_set) == 0:
                 recall = 1
             else:
+#                print('error', q)
                 recall = 0
         else:
             recall = len(tmp)/len(real_sim_set)
@@ -134,12 +137,15 @@ if __name__ == '__main__':
         f1_scores.append(f1_score)
         if len(real_sim_set) > 0:
             f1_scores_nz.append(f1_score)
+#        else:
+#            assert(f1_score == 1 and precision == 1 and recall == 1)
 
 
     print('average precision = %f'%(sum(precisions)/len(precisions)))
     print('average recall = %f'%(sum(recalls)/len(recalls)))
     print('average f1-score = %f'%(sum(f1_scores)/len(f1_scores)))
     print('average returned size = %f'%(sum(ret_size)/len(ret_size)))
+    print('average tmp size = %f'%(sum(intersect_size)/len(intersect_size)))
     print('zero_cnt = %d'%zero_cnt)
 
     if zero_cnt < len(ground_truth.keys()):

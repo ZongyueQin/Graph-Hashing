@@ -11,6 +11,7 @@ using namespace std;
 
 #define CODELEN 32
 #define OUTPUTFILE "output.txt"
+#define dataset "Syn-BA"
 
 int main(int argc, char **argv)
 {
@@ -50,15 +51,15 @@ int main(int argc, char **argv)
 	vector<int> result;
 	vector<int> candidates;
 
-	for(int ub = 0; ub < 6; ub++)
+	for(int ub = 0; ub < 10; ub++)
 	{
 		stringstream ss;
-		ss << "output/t=" << ub << "_" << OUTPUTFILE;
+		ss << "output/" << dataset << "_t=" << ub << "_" << OUTPUTFILE;
 		string outputFile = ss.str();
 		ofstream fout(outputFile);
 
 		stringstream ss2;
-		ss2 << "output/t=" << ub << "_" << "candidate.txt";
+		ss2 << "output/" << dataset << "_t=" << ub << "_" << "candidate.txt";
 		string candidateFile = ss2.str();
 		ofstream fout2(candidateFile);
 

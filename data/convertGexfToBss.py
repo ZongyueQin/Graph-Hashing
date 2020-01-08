@@ -4,16 +4,16 @@ import os
 import pickle
 import xml
 has_dict = True
-data_dir = "linux15/test"
+data_dir = "Syn-BA/test"
 
 graphs = []
 geds = {}
 
-constant =True
+constant =False
 #def node_match(n1, n2):
 #  return n1['type'] == n2['type']
 
-output_file = open(data_dir+"/graphs_nolabel.bss", 'w')
+output_file = open(data_dir+"/graphs.bss", 'w')
 
 if has_dict == False:
   hashing = {}

@@ -4,7 +4,7 @@ flags = tf.app.flags
 FLAGS = flags.FLAGS
 
 #dataset related
-dataset = 'ER'
+dataset = 'Syn-BA'
 
 if dataset == 'linux15':
     flags.DEFINE_string('dataset', 'linux15', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
@@ -22,6 +22,10 @@ elif dataset == 'FULL_ALCHEMY':
     flags.DEFINE_string('dataset', 'FULL_ALCHEMY', 'Dataset string')
     flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
     flags.DEFINE_string('node_feat_name','atom','Name of node feature')
+elif dataset == 'Syn-BA':
+    flags.DEFINE_string('dataset', 'Syn-BA', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
+    flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
+    flags.DEFINE_string('node_feat_name','type','Name of node feature')
 else:
     # You should define your own corresponding attributes here
     flags.DEFINE_string('dataset', 'Syn-ER', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
@@ -38,6 +42,7 @@ flags.DEFINE_integer('max_op', 1, 'maximum operations to generate synthetic grap
 flags.DEFINE_integer('k', 1, 'when training, we would generate k similar graphs for each one of sampled graphs')
 flags.DEFINE_integer('GED_threshold', 11, 'threshold within which 2 graphs are similar')
 flags.DEFINE_integer('batchsize',10,'batch size for training')
+flags.DEFINE_integer('ecd_batchsize', 100, 'encoding batch size')
 flags.DEFINE_string('label_type', 'ged', 'whether training label should be binary or ged')
 
 # loss related
