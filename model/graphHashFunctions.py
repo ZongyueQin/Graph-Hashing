@@ -3,9 +3,11 @@ from metrics import *
 from models import Model
 import tensorflow as tf
 import numpy as np
+from inits import ones
 
 from config import FLAGS
 
+"""
 class GraphHash_Naive(Model):
     def __init__(self, placeholders, input_dim, **kwargs):
         super(GraphHash_Naive, self).__init__(**kwargs)
@@ -129,7 +131,7 @@ class GraphHash_Naive(Model):
         self.layers = [conv_layers, pool_layers, mlp_layers]
 
     def build(self):
-        """ Wrapper for _build() """
+        # Wrapper for _build()
         with tf.variable_scope(self.name):
             self._build()
 
@@ -162,10 +164,11 @@ class GraphHash_Naive(Model):
         self._accuracy()
 
         self.opt_op = self.optimizer.minimize(self.loss)
-
+"""
 
 
 """ One output, continuous embedding """
+"""
 class GraphHash_Emb(GraphHash_Naive):
     def __init__(self, placeholders, input_dim, next_ele, **kwargs):
         super(GraphHash_Naive, self).__init__(**kwargs)
@@ -238,8 +241,10 @@ class GraphHash_Emb(GraphHash_Naive):
         self.mse_loss = mse_loss
         self.pred = pred
         self.lab = lab
+"""
 
 """ one output, discrete code, trained with regularizer """
+"""
 class GraphHash_Code(GraphHash_Emb):
     def __init__(self, placeholders, input_dim, next_ele, **kwargs):
         super(GraphHash_Naive, self).__init__(**kwargs)
@@ -288,7 +293,7 @@ class GraphHash_Code(GraphHash_Emb):
         self.binary_reg_loss = binary_regularizer(self.outputs[0])
 
         self.loss += self.binary_reg_w * self.binary_reg_loss
-
+"""
 
 
 """ Two output, embedding and code """
@@ -445,14 +450,29 @@ class GraphHash_Emb_Code(Model):
             self.activations.append(hidden)
             
         self.outputs = self.activations[-1]
-        
-        # Store model variables for easy access
-        variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.name)
-        self.vars = {var.name: var for var in variables}
+
+        # Initialize Bit Weights
+        if FLAGS.bit_weight_type == 'var':
+            with tf.variable_scope(self.name):
+                with tf.variable_scope(self.name+'_bit_weights'):
+                    self.bit_weights = ones([FLAGS.hash_code_len],name='bit_weights')
+        elif FLAGS.bit_weight_type == 'log':
+            self.bit_weights = tf.consant([np.log(i) for i in FLAGS.hash_code_len], dtype=tf.float32)
+        elif FLAGS.bit_weight_type == 'exp':
+            self.bit_weights = tf.consant([2**i for i in FLAGS.hash_code_len], dtype=tf.float32)
+        elif FLAGS.bit_weight_type == 'const':
+            self.bit_weights = tf.consant([1 for i in FLAGS.hash_code_len], dtype=tf.float32)
+        else:
+            raise RuntimeError('Unrecognized Bit Weight Type: '+FLAGS.bit_weight_type)
 
         # Build metrics
         self._loss()
         self._accuracy()
+
+       
+        # Store model variables for easy access
+        variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.name)
+        self.vars = {var.name: var for var in variables}
 
         self.opt_op = self.optimizer.minimize(self.loss)
 
@@ -501,14 +521,16 @@ class GraphHash_Emb_Code(Model):
                 for var in layer.vars.values():
                     self.loss += FLAGS.weight_decay * tf.nn.l2_loss(var)
 
+        # MSE Loss For Continuous Embedding
         emb_mse_loss, _, _ = MSE_Loss(self.embeddings[0], 
                               self.labels, 
                               self.gen_labels)
 
-
+        
         code_mse_loss, pred, lab = MSE_Loss(self.outputs[0], 
                                             self.labels, 
-                                            self.gen_labels)
+                                            self.gen_labels,
+                                            self.bit_weights)
 
         self.loss = self.loss + code_mse_loss * FLAGS.code_mse_w
         self.loss = self.loss + emb_mse_loss * FLAGS.emb_mse_w
@@ -529,6 +551,7 @@ class GraphHash_Emb_Code(Model):
     def getGEDByCode(self, code1, code2):
         return np.sum((code1-code2)**2)
    
+"""
 class GraphHash_Emb_Code_Mapper(GraphHash_Emb_Code):
     def __init__(self, placeholders, input_dim, next_ele, mapper, **kwargs):
 
@@ -577,4 +600,4 @@ class GraphHash_Emb_Code_Mapper(GraphHash_Emb_Code):
         self.loss += FLAGS.binary_regularizer_weight*\
                     binary_regularizer(self.outputs[0])
 
-
+"""
