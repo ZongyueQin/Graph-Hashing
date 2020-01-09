@@ -3,6 +3,8 @@
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from random import shuffle
+import numpy as np
 
 import tensorflow as tf
 import time
@@ -12,10 +14,73 @@ from utils import *
 #from CSM_train import run_tf
 #from utils_siamese import convert_msec_to_sec_str
 
+def initProximityMat(sess, model, placeholders, data_fetcher):
+    if len(data_fetcher.train_graphs) < FLAGS.sample_pool_size:
+        raise RuntimeError('FLAGS.sample_pool size is larger than total graph number')
+    if FLAGS.sample_pool_size % FLAGS.ecd_batchsize != 0:
+        raise RuntimeError('sample_pool_size % ecd_batchsize has to be 0')
+
+    shuffle(data_fetcher.train_graphs)
+
+    sample_embs = np.zeros((FLAGS.sample_pool_size, FLAGS.embedding_dim))
+    bs = FLAGS.ecd_batchsize
+    for i in range(0,FLAGS.sample_pool_size, bs):
+        idx_list = list(range(i,i+bs))
+        feed_dict = construct_feed_dict_for_encode(data_fetcher, 
+                                                   placeholders, 
+                                                   idx_list,
+                                                   'train')
+        embs = sess.run(model.ecd_embeddings, feed_dict = feed_dict)
+        sample_embs[i:i+bs,:]=np.array(embs)
+
+    M1 = sample_embs@sample_embs.T
+    diag = np.squeeze(np.diag(M1))
+    M2 = np.stack([diag for i in range(FLAGS.sample_pool_size)])
+    proximityMat= M2+M2.T-2*M1
+
+    data_fetcher.positive_cum_p = np.exp(-proximityMat)
+    data_fetcher.negative_cum_p = np.exp(proximityMat)
+    data_fetcher.sample_ptr = 0
+    data_fetcher.sample_bias = 0
+    return sample_embs
+
+def updateProximityMat(sess, model, placeholders, data_fetcher, sample_embs):
+    bs = FLAGS.ecd_batchsize
+    sample_embs[0:-bs,:]=sample_embs[bs:,:]
+
+    i = data_fetcher.sample_ptr + data_fetcher.sample_bias
+    end = i + bs
+    N = len(data_fetcher.train_graphs)
+    if end > N:
+        end = N
+    idx_list = list(range(i,end))+list(range(0,bs-(end-i)))
+    feed_dict = construct_feed_dict_for_encode(data_fetcher,
+                                               placeholders,
+                                               idx_list,
+                                               'train')
+    embs = sess.run(model.ecd_embeddings, feed_dict = feed_dict)
+    sample_embs[-bs:,:]=np.array(embs)
+
+    M1 = sample_embs@sample_embs.T
+    diag = np.squeeze(np.diag(M1))
+    M2 = np.stack([diag for i in range(FLAGS.sample_pool_size)])
+    proximityMat= M2+M2.T-2*M1
+
+    data_fetcher.positive_cum_p = np.exp(-proximityMat)
+    data_fetcher.negative_cum_p = np.exp(proximityMat)
+#    data_fetcher.sample_ptr = 0
+#    data_fetcher.sample_bias = data_fetcher.sample_bias + bs
+ 
+
+
+
 def train_model(sess, model, saver, placeholders, data_fetcher, 
                 save_path = "SavedModel/model_rank.ckpt"):
     print('start optimization...')
     sess.run(tf.global_variables_initializer())
+    if FLAGS.sample_by_proximity == True:
+        sample_embs = initProximityMat(sess, model, placeholders, data_fetcher)
+
     train_start = time.time()
     last_large_range_losses = []
     last_small_range_losses = []
@@ -27,8 +92,21 @@ def train_model(sess, model, saver, placeholders, data_fetcher,
         # Construct feed dictionary
         feed_dict = construct_feed_dict_prefetch(data_fetcher, placeholders)
         # Training step
-        outs = sess.run([model.opt_op, model.loss], feed_dict=feed_dict)
+        outs = sess.run([model.opt_op, model.loss, model.bit_weights], feed_dict=feed_dict)
         train_losses.append(outs[1])
+
+        if FLAGS.sample_by_proximity == True and (epoch+1) % FLAGS.ecd_batchsize == 0:
+            data_fetcher.sample_ptr = 0
+            data_fetcher.sample_bias = data_fetcher.sample_bias + FLAGS.ecd_batchsize
+            if data_fetcher.sample_bias > len(data_fetcher.train_graphs):
+                print('Reinitialize proximity matrix...')
+                sample_embs = initProximityMat(sess, model, placeholders, data_fetcher)
+            else:
+                print('update proximity matrix...')
+                updateProximityMat(sess, model, placeholders, data_fetcher, sample_embs)
+
+
+
         last_large_range_losses.append(outs[1])
         if len(last_large_range_losses) > FLAGS.early_stopping_large_range:
             last_large_range_losses.pop(0)

@@ -20,7 +20,7 @@ import xml
 
 from nx_to_gxl import nx_to_gxl
 from config import FLAGS
-from utils import sorted_nicely
+from utils import sorted_nicely, sample_from_polynomial
 from MyGraph import *
 
 class DataFetcher:
@@ -77,7 +77,14 @@ class DataFetcher:
             self.node_feature_dim = self.train_graphs[0].sparse_node_inputs.shape[1]
         else:
             raise RuntimeError('train_graphs is empty, can\'t get feature dim')
- 
+
+        if FLAGS.sample_by_proximity == True:
+            # The following variables need to be maintained outside the DataFetcher with 
+            # model during training, see train.py
+            self.positive_cum_p = np.ones([FLAGS.sample_pool_size, FLAGS.sample_pool_size])
+            self.negative_cum_p = np.ones([FLAGS.sample_pool_size, FLAGS.sample_pool_size])
+            self.sample_ptr = 0
+            self.sample_bias = 0
 
     def getGraphByGid(self, gid):
         return self.gid2graph[gid]
@@ -115,7 +122,47 @@ class DataFetcher:
             yield np.array(feat[0]), np.array(feat[1]), np.array(feat[2]),\
             np.array(lap[0]), np.array(lap[1]), np.array(lap[2]),\
             np.array(sizes), np.array(labels), np.array(gen_labels)
-        
+
+  
+    def sampleByProximity(self):
+        # Positive Sample
+        # self.positive_cum_p is a n*n matrix
+        n = FLAGS.sample_pool_size
+        N = len(self.train_graphs)
+        cum_p = np.zeros((n-1))
+        if self.sample_ptr > 0:
+            cum_p[0:self.sample_ptr] = self.positive_cum_p[self.sample_ptr,0:self.sample_ptr]
+        if self.sample_ptr < n-1:
+            cum_p[self.sample_ptr:] = self.positive_cum_p[self.sample_ptr,self.sample_ptr+1:]
+        cum_p = cum_p / np.sum(cum_p)
+        cum_p = np.cumsum(cum_p)
+
+        positive_sample_idx = sample_from_polynomial(cum_p, FLAGS.positive_sample_num) + self.sample_bias
+        positive_sample_idx = positive_sample_idx % N
+
+        # Negative Sample
+        if self.sample_ptr > 0:
+            cum_p[0:self.sample_ptr] = self.negative_cum_p[self.sample_ptr,0:self.sample_ptr]
+        if self.sample_ptr < n-1:
+            cum_p[self.sample_ptr:] = self.negative_cum_p[self.sample_ptr,self.sample_ptr+1:]
+        cum_p = cum_p / np.sum(cum_p)
+        cum_p = np.cumsum(cum_p)
+
+        negative_sample_idx = sample_from_polynomial(cum_p, FLAGS.batchsize-FLAGS.positive_sample_num)+self.sample_bias
+        negative_sample_idx = negative_sample_idx % N
+
+        sample_idx = list(positive_sample_idx)+list(negative_sample_idx)
+        self.sample_ptr = self.sample_ptr + 1
+        if self.sample_ptr == self.positive_cum_p.shape[0]:
+            self.sample_ptr = 0
+#        print('cum_p')
+#        print(cum_p)
+#        print('sample_ptr=%d'%self.sample_ptr)
+#        print('sample_bias=%d'%self.sample_bias)
+#        print(sample_idx)
+        return sample_idx
+
+       
     """ Sample training data """
     def sample_train_data(self, batchsize):
         """ we would First sample $batchsize graphs from train_graphs and 
@@ -124,8 +171,11 @@ class DataFetcher:
             merge features and laplacian matrices of batchsize*(k+1) graphs
             together and return feature matrix, laplacian matrix, sizes of each 
             graph and labels of each pair of sampled graphs """
-        
-        self.sample_train_graphs_and_compute_label(batchsize)
+        if FLAGS.sample_by_proximity == True:
+            sample_idx = self.sampleByProximity()
+        else:
+            sample_idx = None
+        self.get_train_graphs_and_compute_label(batchsize, sample_idx)
         
         # generate k similar graphs for each graph in self.sample_graphs
         """
@@ -169,27 +219,31 @@ class DataFetcher:
 
         return features, laplacians, sizes, self.labels, generated_labels
         
-    """ sample train_graphs and compute label between each pair of graphs """
-    def sample_train_graphs_and_compute_label(self, batchsize):
-        # sample $batchsize graphs
-        start = self.cur_train_sample_ptr
-        #else:
-        #    start = batchsize*iteration%len(self.train_graphs)
-        end = start + batchsize
-        if end > len(self.train_graphs):
-            end = len(self.train_graphs)
+    """ get train_graphs and compute label between each pair of graphs """
+    def get_train_graphs_and_compute_label(self, batchsize, sample_idx = None):
+        if sample_idx is None:
+            # sample $batchsize graphs
+            start = self.cur_train_sample_ptr
+            #else:
+            #    start = batchsize*iteration%len(self.train_graphs)
+            end = start + batchsize
+            if end > len(self.train_graphs):
+                end = len(self.train_graphs)
         
-        sample_graphs = self.train_graphs[start:end]
-        self.cur_train_sample_ptr = end
-        # set pointer to the beginning and shuffle if pointer is at end
-        if self.cur_train_sample_ptr == len(self.train_graphs):
-            shuffle(self.train_graphs)
-            self.cur_train_sample_ptr = 0        
-        if len(sample_graphs) < batchsize:
-            sample_graphs = sample_graphs +\
-            self.train_graphs[0:batchsize-len(sample_graphs)]
+            sample_graphs = self.train_graphs[start:end]
+            self.cur_train_sample_ptr = end
+            # set pointer to the beginning and shuffle if pointer is at end
+            if self.cur_train_sample_ptr == len(self.train_graphs):
+                shuffle(self.train_graphs)
+                self.cur_train_sample_ptr = 0        
+            if len(sample_graphs) < batchsize:
+                sample_graphs = sample_graphs +\
+                self.train_graphs[0:batchsize-len(sample_graphs)]
+            self.sample_graphs = sample_graphs
+        else:
+            self.sample_graphs = [self.train_graphs[idx] for idx in sample_idx]
 
-        self.sample_graphs = sample_graphs
+
         # Compute Label of every pair
         if not self.exact_ged:
             self.labels = self.getApproxGEDForEachPair(sample_graphs)

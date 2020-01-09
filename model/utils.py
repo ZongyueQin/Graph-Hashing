@@ -8,6 +8,14 @@ import networkx as nx
 from glob import glob
 import xml
 
+def sample_from_polynomial(cum_p, num):
+    u = np.random.uniform(size=[num])
+    cum_P = np.tile(cum_p, (num,1))
+    U = (np.tile(u,(cum_p.shape[0],1))).T
+    A = (U<cum_P)*(2-cum_P)
+    ret = np.argmax(A,axis=1)
+    return ret
+
 def construct_input(data):
     features = tf.SparseTensor(data[0],data[1],data[2])
     laplacians = tf.SparseTensor(data[3],data[4],data[5])

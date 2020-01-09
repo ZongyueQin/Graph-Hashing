@@ -4,7 +4,7 @@ flags = tf.app.flags
 FLAGS = flags.FLAGS
 
 #dataset related
-dataset = 'linux15'
+dataset = 'FULL_ALCHEMY'
 
 if dataset == 'linux15':
     flags.DEFINE_string('dataset', 'linux15', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
@@ -32,7 +32,13 @@ else:
     flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
     flags.DEFINE_string('node_feat_name','type','Name of node feature')
 
-flags.DEFINE_string('bit_weight_type', 'var', 'type of bit weight type, const, log, exp or var')
+# flags for sample by proximity
+flags.DEFINE_boolean('sample_by_proximity', False, 'if enable sample by proximity')
+flags.DEFINE_integer('sample_pool_size', 40, 'Sample Pool Size')
+flags.DEFINE_integer('positive_sample_num', 5, 'positive sample number')
+
+
+flags.DEFINE_string('bit_weight_type', 'const', 'type of bit weight type, const, log, exp or var')
 
 flags.DEFINE_string('ground_truth_file', 'GT11.txt', 'ground truth file, should be in test directory')
 flags.DEFINE_string('node_label_name', 'label', 'Name of node label, none if it\'s idx')
@@ -43,7 +49,7 @@ flags.DEFINE_integer('max_op', 1, 'maximum operations to generate synthetic grap
 flags.DEFINE_integer('k', 1, 'when training, we would generate k similar graphs for each one of sampled graphs')
 flags.DEFINE_integer('GED_threshold', 11, 'threshold within which 2 graphs are similar')
 flags.DEFINE_integer('batchsize',10,'batch size for training')
-flags.DEFINE_integer('ecd_batchsize', 100, 'encoding batch size')
+flags.DEFINE_integer('ecd_batchsize', 20, 'encoding batch size')
 flags.DEFINE_string('label_type', 'ged', 'whether training label should be binary or ged')
 
 # loss related
