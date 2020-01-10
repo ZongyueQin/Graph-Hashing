@@ -13,6 +13,7 @@ class Database
 private:
 	int embLen, codeLen;
 	int totalCodeCnt;
+	double *bit_weights;
 
 	vector <graph> graphDB;
 	const string pythonPath = "../model";
@@ -29,6 +30,7 @@ public:
 	Database(const string &modelPath, const string &db,  
 		 const string &invIndex,
 		 int totalGraph, int _codeLen,
+		 const string &BitWeightsFile,
 		 const string &GED2HammingFile="");
 	~Database()
 	{

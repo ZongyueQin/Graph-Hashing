@@ -7,7 +7,7 @@ class SearchNode
 {
 public:
 	uint64_t code;
-	int dist;
+	double dist;
 	int last_flip_pos;
 	SearchNode(uint64_t c, int d, int l)
 	{
@@ -97,7 +97,8 @@ uint64_t getHammingDistance(uint64_t a, uint64_t b, int len)
 // return is in res, the index (position) in Code2Pos
 void getAllValidCode(uint64_t code, int thres, 
 				int totalCodeCnt, int codeLen, 
-				CodePos *index, vector<uint64_t> &res)
+				CodePos *index, vector<uint64_t> &res,
+				double *bit_weights)
 {
 	uint64_t searchSpace = computeSearchSpace(codeLen, thres);
 	if (searchSpace > totalCodeCnt)
@@ -137,7 +138,7 @@ void getAllValidCode(uint64_t code, int thres,
 			{
 				uint64_t mask = (1 << pow);
 				uint64_t newCode = curNode.code ^ mask;
-				que.push(SearchNode(newCode, curNode.dist+1, 
+				que.push(SearchNode(newCode, curNode.dist+bit_weights[pow], 
 							pow));
 			}			
 		}
@@ -252,8 +253,16 @@ int getTopKByCode(int K, uint64_t code, int codeLen, int thres, int totalCodeCnt
 Database::Database(const string &modelPath, const string &db, 
 			const string &invIndex, 
 			int totalGraph, int _codeLen,
+			const string &BitWeightsFile,
 			const string &GED2HammingFile)
 {
+	// Read Bit Weights File
+	this->bit_weights = new double[_codeLen];
+	ifstream BW_Fin(BitWeightsFile);
+	for(int i = 0; i < _codeLen; i++)
+		BW_Fin >> this->bit_weights[i];
+	BW_Fin.close();
+
 	if (GED2HammingFile == "")
 		for(int i = 0; i < 10; i++)
 			GED2Hamming[i] = i + 1;
@@ -443,7 +452,7 @@ Database::QueryProcessGetCandidate(const int qid, const int ub, const int width,
 	vector <uint64_t> validCode;	
 
 	getAllValidCode(qCode, GED2Hamming[ub], totalCodeCnt, codeLen, code2Pos,
-			validCode);
+			validCode, this->bit_weights);
 //	getAllValidCode(qCode, ub+1, totalCodeCnt, codeLen, code2Pos,
 //			validCode);
 
@@ -518,7 +527,7 @@ Database::QueryProcess(const int qid, const int ub, const int width,
 	vector <uint64_t> validCode;	
 	gettimeofday(&start, NULL);
 	getAllValidCode(qCode, GED2Hamming[ub], totalCodeCnt, codeLen, code2Pos,
-			validCode);
+			validCode, this->bit_weights);
 	//getAllValidCode(qCode, ub+1, totalCodeCnt, codeLen, code2Pos,
 	//		validCode);
 

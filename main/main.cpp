@@ -18,7 +18,7 @@ int main(int argc, char **argv)
 	if(argc < 8)
 	{
 		cout << "database n query m  w model_path " << 
-			 "inv_idx_txt [mapper_file]" << endl; 
+			 "inv_idx_txt BitWeightFile, [mapper_file]" << endl; 
 		exit(0);
 	}
 	string db_path = argv[1]; // the bss file where data graphs are stored.
@@ -32,13 +32,17 @@ int main(int argc, char **argv)
 
 	string invIdxTxtPath = argv[7]; // .txt file to load inverted index
 
+	string BitWeightsFile = string(argv[8]);
+
 	string GED2HammingFile = "";
-	if (argc == 9)
-		GED2HammingFile = string(argv[8]);
+	if (argc == 10)
+		GED2HammingFile = string(argv[9]);
 
 	Database database(model_path, db_path, 
 			invIdxTxtPath,
-			totalGraph, CODELEN, GED2HammingFile);
+			totalGraph, CODELEN, 
+			BitWeightsFile,
+			GED2HammingFile);
 	
 	string query_out = query+"_ordered";
         // Note BSS-GED need to call reOrderGraphs before call readGraphMemory
