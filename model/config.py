@@ -38,7 +38,7 @@ flags.DEFINE_integer('sample_pool_size', 40, 'Sample Pool Size')
 flags.DEFINE_integer('positive_sample_num', 5, 'positive sample number')
 
 
-flags.DEFINE_string('bit_weight_type', 'const', 'type of bit weight type, const, log, exp or var')
+flags.DEFINE_string('bit_weight_type', 'var', 'type of bit weight type, const, log, exp or var')
 
 flags.DEFINE_string('ground_truth_file', 'GT11.txt', 'ground truth file, should be in test directory')
 flags.DEFINE_string('node_label_name', 'label', 'Name of node label, none if it\'s idx')

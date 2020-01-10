@@ -35,7 +35,7 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
 
-model_name = "0106:20:37_"+FLAGS.dataset
+model_name = "0110:09:37_var_no_sample_"+FLAGS.dataset
 model_path = "SavedModel/"+model_name+".ckpt"
 saved_files_dir = "SavedModel"
 
