@@ -121,7 +121,7 @@ start_time = time.time()
 #                                                     data_fetcher, 
 #                                                     placeholders,
 #                                                     True, True)
-inverted_index, id2emb, id2code = encodeDataInDir(sess, model,
+inverted_index, id2emb, id2code, bit_weights = encodeDataInDir(sess, model,
                                                   data_fetcher,
                                                   data_fetcher.train_data_dir,
                                                   placeholders)
@@ -133,6 +133,10 @@ index_file.close()
 writeInvertedIndex(os.path.join(saved_files_dir, 'inverted_index_'+model_name+'.txt'),
                    inverted_index, 
                    FLAGS.embedding_dim)
+print('Bit Weights:')
+print(bit_weights)
+writeBitWeights(os.path.join(saved_files_dir, 'bit_weights_'+model_name+'.txt'),
+        bit_weights)
 
 #writeMapperDict(model.mapper, os.path.join(saved_files_dir, 'mapper_dict_'+model_name+'.txt'))
 

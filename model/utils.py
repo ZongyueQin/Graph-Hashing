@@ -180,6 +180,13 @@ def writeMapperDict(mapper_dict, fname):
         f.write(str(max(mapper_dict[i]))+'\n')
     f.close()
 
+def writeBitWeights(filename, bit_weights):
+    f = open(filename, 'w')
+    bit_weights = list(bit_weights)
+    for w in bit_weights:
+        f.write(str(w)+'\n')
+    f.close()
+
 def writeInvertedIndex(filename, index, embLen = FLAGS.hash_code_len):
     f = open(filename, 'w')
     f.write(str(len(index.keys()))+'\n')
@@ -517,5 +524,6 @@ def encodeDataInDir(sess, model, data_fetcher, graph_dir, placeholders,
     encodeData(sess, model, data_fetcher, graphs, placeholders,use_emb,use_code,
                inverted_index, id2emb, id2code)     
 
+    bit_weights = sess.run(model.bit_weights)
     print('finish encoding training data') 
-    return inverted_index, id2emb, id2code
+    return inverted_index, id2emb, id2code, bit_weights
