@@ -4,7 +4,7 @@ import os
 import pickle
 import xml
 has_dict = True
-data_dir = "Syn-BA/test"
+data_dir = "FULL_ALCHEMY/test"
 
 graphs = []
 geds = {}
@@ -44,10 +44,10 @@ for g_file in glob(data_dir+'/*.gexf'):
     if constant:
       output_file.write('1\n')
     else:  
-      if n[1]['type'] not in hashing.keys():
-        hashing[n[1]['type']] = typeCnt
+      if n[1]['atom'] not in hashing.keys():
+        hashing[n[1]['atom']] = typeCnt
         typeCnt = typeCnt + 1
-      output_file.write(str(hashing[n[1]['type']])+'\n')
+      output_file.write(str(hashing[n[1]['atom']])+'\n')
      
     #output_file.write('1\n')
     label2node[n[1]['label']] = i

@@ -137,7 +137,9 @@ class DataFetcher:
         cum_p = cum_p / np.sum(cum_p)
         cum_p = np.cumsum(cum_p)
 
-        positive_sample_idx = sample_from_polynomial(cum_p, FLAGS.positive_sample_num) + self.sample_bias
+        positive_sample_idx = sample_from_polynomial(cum_p, FLAGS.positive_sample_num)
+        positive_sample_idx[positive_sample_idx>=self.sample_ptr]= positive_sample_idx[positive_sample_idx>=self.sample_ptr]+1
+        positive_sample_idx = positive_sample_idx + self.sample_bias
         positive_sample_idx = positive_sample_idx % N
 
         # Negative Sample
@@ -148,10 +150,13 @@ class DataFetcher:
         cum_p = cum_p / np.sum(cum_p)
         cum_p = np.cumsum(cum_p)
 
-        negative_sample_idx = sample_from_polynomial(cum_p, FLAGS.batchsize-FLAGS.positive_sample_num)+self.sample_bias
+        negative_sample_idx = sample_from_polynomial(cum_p, FLAGS.batchsize-FLAGS.positive_sample_num-1)
+        negative_sample_idx[negative_sample_idx>=self.sample_ptr] = negative_sample_idx[negative_sample_idx>=self.sample_ptr]+1
+        negative_sample_idx = negative_sample_idx + self.sample_bias
         negative_sample_idx = negative_sample_idx % N
 
-        sample_idx = list(positive_sample_idx)+list(negative_sample_idx)
+        sample_idx = [(self.sample_bias+self.sample_ptr)%N]+list(positive_sample_idx)+list(negative_sample_idx)
+        #print(sample_idx)
         self.sample_ptr = self.sample_ptr + 1
         if self.sample_ptr == self.positive_cum_p.shape[0]:
             self.sample_ptr = 0

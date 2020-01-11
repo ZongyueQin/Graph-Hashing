@@ -33,8 +33,8 @@ else:
     flags.DEFINE_string('node_feat_name','type','Name of node feature')
 
 # flags for sample by proximity
-flags.DEFINE_boolean('sample_by_proximity', False, 'if enable sample by proximity')
-flags.DEFINE_integer('sample_pool_size', 40, 'Sample Pool Size')
+flags.DEFINE_boolean('sample_by_proximity', True, 'if enable sample by proximity')
+flags.DEFINE_integer('sample_pool_size', 100, 'Sample Pool Size')
 flags.DEFINE_integer('positive_sample_num', 5, 'positive sample number')
 
 

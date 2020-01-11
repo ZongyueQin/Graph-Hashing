@@ -5,7 +5,7 @@ import os
 import random
 
 from utils import *
-from graphHashFunctions import GraphHash_Emb_Code_Mapper, GraphHash_Emb_Code
+from graphHashFunctions import GraphHash_Emb_Code
 from config import FLAGS
 from DataFetcher import DataFetcher
 

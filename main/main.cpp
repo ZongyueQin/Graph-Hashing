@@ -11,11 +11,11 @@ using namespace std;
 
 #define CODELEN 32
 #define OUTPUTFILE "output.txt"
-#define dataset "Syn-BA"
+#define dataset "FULL_ALCHEMY"
 
 int main(int argc, char **argv)
 {
-	if(argc < 8)
+	if(argc < 9)
 	{
 		cout << "database n query m  w model_path " << 
 			 "inv_idx_txt BitWeightFile, [mapper_file]" << endl; 
@@ -55,7 +55,7 @@ int main(int argc, char **argv)
 	vector<int> result;
 	vector<int> candidates;
 
-	for(int ub = 0; ub < 10; ub++)
+	for(int ub = 0; ub < 5; ub++)
 	{
 		stringstream ss;
 		ss << "output/" << dataset << "_t=" << ub << "_" << OUTPUTFILE;

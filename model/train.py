@@ -67,7 +67,7 @@ def updateProximityMat(sess, model, placeholders, data_fetcher, sample_embs):
     proximityMat= M2+M2.T-2*M1
 
     data_fetcher.positive_cum_p = np.exp(-proximityMat)
-    data_fetcher.negative_cum_p = np.exp(proximityMat)
+    data_fetcher.negative_cum_p = proximityMat
 #    data_fetcher.sample_ptr = 0
 #    data_fetcher.sample_bias = data_fetcher.sample_bias + bs
  
@@ -92,8 +92,11 @@ def train_model(sess, model, saver, placeholders, data_fetcher,
         # Construct feed dictionary
         feed_dict = construct_feed_dict_prefetch(data_fetcher, placeholders)
         # Training step
-        outs = sess.run([model.opt_op, model.loss, model.bit_weights], feed_dict=feed_dict)
+        outs = sess.run([model.opt_op, model.loss, model.pred, model.lab], feed_dict=feed_dict)
         train_losses.append(outs[1])
+        if epoch % 100 == 0:
+            print(outs[2])
+            print(outs[3])
 
         if FLAGS.sample_by_proximity == True and (epoch+1) % FLAGS.ecd_batchsize == 0:
             data_fetcher.sample_ptr = 0

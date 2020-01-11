@@ -127,21 +127,24 @@ void getAllValidCode(uint64_t code, int thres,
 			res.push_back(idx);
 //			fprintf(stdout, "%d\n", index[idx].code);
 		}
-#ifdef LOOSE
-		if (curNode.dist <= thres)
-#else
-		if (curNode.dist < thres)
-#endif
-		{
+//#ifdef LOOSE
+//		if (curNode.dist <= (double) thres)
+//#else
+//		if (curNode.dist < (double) thres)
+//#endif
+//		{
 			int pow = curNode.last_flip_pos + 1;
 			for(; pow < codeLen; pow++)
 			{
+//				if (bit_weights[pow]!=1) cout << "error " << pow << ' ' << bit_weights[pow] << endl;
+				if (curNode.dist + bit_weights[pow] >= thres)
+					continue;
 				uint64_t mask = (1 << pow);
 				uint64_t newCode = curNode.code ^ mask;
 				que.push(SearchNode(newCode, curNode.dist+bit_weights[pow], 
 							pow));
 			}			
-		}
+//		}
 	}
     
 } 
@@ -262,6 +265,10 @@ Database::Database(const string &modelPath, const string &db,
 	for(int i = 0; i < _codeLen; i++)
 		BW_Fin >> this->bit_weights[i];
 	BW_Fin.close();
+	cout << "Bit Weights:" << endl;
+	for(int i = 0; i < _codeLen; i++)
+		cout << this->bit_weights[i] << ' ';
+	cout << endl;
 
 	if (GED2HammingFile == "")
 		for(int i = 0; i < 10; i++)

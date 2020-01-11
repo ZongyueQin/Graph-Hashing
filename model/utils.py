@@ -525,5 +525,7 @@ def encodeDataInDir(sess, model, data_fetcher, graph_dir, placeholders,
                inverted_index, id2emb, id2code)     
 
     bit_weights = sess.run(model.bit_weights)
+    if bit_weights is None:
+        bit_weights = np.ones((FLAGS.hash_code_len))
     print('finish encoding training data') 
     return inverted_index, id2emb, id2code, bit_weights
