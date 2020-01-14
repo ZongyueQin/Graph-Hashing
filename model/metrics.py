@@ -104,7 +104,7 @@ def MSE_Loss_SimGNN(preds, label_1, label_2):
 
 def MSE_Loss(codes, label_1, label_2, bit_weights=None):
 
-    a = 0.2
+    a = FLAGS.exp_a
 
     bs = FLAGS.batchsize
     k = FLAGS.k

@@ -415,8 +415,8 @@ class GraphHash_Emb_Code(Model):
         discrete_layers.append(Dense(input_dim=FLAGS.hidden6,
                                  output_dim=self.output_dim,
                                  placeholders=self.placeholders,
-                                 act=lambda x: x,
-#                                 act=tf.nn.tanh,
+#                                 act=lambda x: x,
+                                 act = lambda x: 0.5*tf.nn.tanh(x),
                                  bias=True,
                                  dropout=FLAGS.dropout>0,
                                  logging=self.logging))
@@ -459,7 +459,7 @@ class GraphHash_Emb_Code(Model):
         elif FLAGS.bit_weight_type == 'log':
             self.bit_weights = tf.constant([np.log(i+1)+1 for i in range(FLAGS.hash_code_len)], dtype=tf.float32)
         elif FLAGS.bit_weight_type == 'exp':
-            self.bit_weights = tf.constant([2**i for i in range(FLAGS.hash_code_len)], dtype=tf.float32)
+            self.bit_weights = tf.constant([2**(i-1) for i in range(FLAGS.hash_code_len)], dtype=tf.float32)
         elif FLAGS.bit_weight_type == 'const':
             #self.bit_weights = None
             self.bit_weights = tf.constant([1 for i in range(FLAGS.hash_code_len)], dtype=tf.float32)

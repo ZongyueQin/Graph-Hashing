@@ -98,7 +98,7 @@ def train_model(sess, model, saver, placeholders, data_fetcher,
             print(outs[2])
             print(outs[3])
 
-        if FLAGS.sample_by_proximity == True and (epoch+1) % FLAGS.ecd_batchsize == 0:
+        if FLAGS.sample_by_proximity == True and (epoch+1) % FLAGS.update_iter_num == 0:
             data_fetcher.sample_ptr = 0
             data_fetcher.sample_bias = data_fetcher.sample_bias + FLAGS.ecd_batchsize
             if data_fetcher.sample_bias > len(data_fetcher.train_graphs):

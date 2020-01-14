@@ -34,11 +34,12 @@ else:
 
 # flags for sample by proximity
 flags.DEFINE_boolean('sample_by_proximity', True, 'if enable sample by proximity')
-flags.DEFINE_integer('sample_pool_size', 100, 'Sample Pool Size')
+flags.DEFINE_integer('sample_pool_size', 200, 'Sample Pool Size')
 flags.DEFINE_integer('positive_sample_num', 5, 'positive sample number')
+flags.DEFINE_integer('update_iter_num', 10, 'Number of iterations to update sample pool') # recommend ecd_batchsize/batchsize
 
 
-flags.DEFINE_string('bit_weight_type', 'var', 'type of bit weight type, const, log, exp or var')
+flags.DEFINE_string('bit_weight_type', 'const', 'type of bit weight type, const, log, exp or var')
 
 flags.DEFINE_string('ground_truth_file', 'GT11.txt', 'ground truth file, should be in test directory')
 flags.DEFINE_string('node_label_name', 'label', 'Name of node label, none if it\'s idx')
@@ -46,21 +47,22 @@ flags.DEFINE_boolean('clip', True, 'clip GED beyond GED_threshold')
 
 # data sample related
 flags.DEFINE_integer('max_op', 1, 'maximum operations to generate synthetic graphs')
-flags.DEFINE_integer('k', 1, 'when training, we would generate k similar graphs for each one of sampled graphs')
+flags.DEFINE_integer('k', 0, 'when training, we would generate k similar graphs for each one of sampled graphs')
 flags.DEFINE_integer('GED_threshold', 11, 'threshold within which 2 graphs are similar')
 flags.DEFINE_integer('batchsize',10,'batch size for training')
-flags.DEFINE_integer('ecd_batchsize', 20, 'encoding batch size')
+flags.DEFINE_integer('ecd_batchsize', 100, 'encoding batch size')
 flags.DEFINE_string('label_type', 'ged', 'whether training label should be binary or ged')
 
 # loss related
+flags.DEFINE_float('exp_a', 0.2, 'a for exp weight')
 flags.DEFINE_float('weight_decay', 0.00, 'Weight for L2 loss on embedding matrix.')
-flags.DEFINE_float('DSH_loss_m',24,'parameter m for DSH loss')
-flags.DEFINE_float('binary_regularizer_weight',5,'weight for binary regularizer')
-flags.DEFINE_float('MAX_BRW', 2, 'maximal binary regularizer weight')
-flags.DEFINE_float('BRW_increase_rate', 5, 'the rate to incrase binary regularizer weight')
+#flags.DEFINE_float('DSH_loss_m',24,'parameter m for DSH loss')
+flags.DEFINE_float('binary_regularizer_weight',0.2,'weight for binary regularizer')
+#flags.DEFINE_float('MAX_BRW', 2, 'maximal binary regularizer weight')
+#flags.DEFINE_float('BRW_increase_rate', 5, 'the rate to incrase binary regularizer weight')
 flags.DEFINE_float('real_data_loss_weight', 1, 'weight of real data part (loss_1) in MSE_loss')
 flags.DEFINE_float('syn_data_loss_weight', 1, 'weight of synthesized data part (loss_2) in MSE_loss')
-flags.DEFINE_float('l1_loss_w',0.0,'weight of l1 loss for codes')
+#flags.DEFINE_float('l1_loss_w',0.0,'weight of l1 loss for codes')
 flags.DEFINE_float('code_mse_w', 1, 'weight for code mse loss')
 flags.DEFINE_float('emb_mse_w', 10, 'weight for emb mse loss')
 
@@ -98,5 +100,5 @@ flags.DEFINE_integer('hamming_dist_thres', 2, 'threshold of similar binary codes
 flags.DEFINE_integer('top_k', 10, 'how many nearest neighbors to retrieve')
 
         
-flags.DEFINE_integer('max_degree', 3, 'Maximum Chebyshev polynomial degree.')
+#flags.DEFINE_integer('max_degree', 3, 'Maximum Chebyshev polynomial degree.')
 flags.DEFINE_integer('beam_width', 15, 'beam width for BSS_GED')
