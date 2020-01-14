@@ -12,17 +12,18 @@ import numpy as np
 
 def write_graph(graph, f, n):
     f.write('%d\n'%n)
+    f.write('{} {}\n'.format(len(graph.nodes()), len(graph.edges())))
     for i, node in graph.nodes(data=True):
-        f.write(str(node[1]['type'])+'\n')
-    for e in g.edges():
-        f.write("%d %d 1\n"%(node[1]['label'],node[1]['label']))
+        f.write(str(node['type'])+'\n')
+    for e in graph.edges():
+        f.write("%d %d 1\n"%(e[0],e[1]))
 
 
 
 train_file = "BA/train/graphs.bss"
 test_file = "BA/test/graphs.bss"
 
-N = 49999900
+N = 499#99900
 cnt = 0
 ave_v_num = 10
 
@@ -35,24 +36,25 @@ s = 0
 for i in range(alpha.size):
     s = s + alpha[i]
     theta[i] = s
+print(theta)
     
 
-f = open(train_file, 'w')
+file = open(train_file, 'w')
 while cnt < N:
     if cnt % 1000000 == 0:
         print('finish %d'%cnt)
         
     n = np.random.poisson(lam=ave_v_num)
-    while n > 15:
+    while n > 15 or n < 7:
         n = np.random.poisson(lam=ave_v_num)
         
-    m = np.random.randint(n)
+    m = np.random.randint(1, n)
     G = nx.generators.random_graphs.barabasi_albert_graph(n,m)
     newG = nx.Graph()
     for node in G.nodes():
         t = np.random.uniform()
-        for i in range(alpha.size-1):
-            if t < theta[i+1]:
+        for i in range(alpha.size):
+            if t < theta[i]:
                 newG.add_node(node, type=i)
                 f = True
                 break
@@ -60,23 +62,23 @@ while cnt < N:
         print('error')
     for edge in G.edges():
         newG.add_edge(*edge)
-    write_graph(newG, f, cnt)
+    write_graph(newG, file, cnt)
     cnt = cnt + 1
-f.close()
+file.close()
 
-f = open(test_file, 'w')
-while cnt < 100:
+file = open(test_file, 'w')
+while cnt < N+100:
     n = np.random.poisson(lam=ave_v_num)
-    while n > 15:
+    while n > 15 and n < 7:
         n = np.random.poisson(lam=ave_v_num)
         
-    m = np.random.randint(n)
+    m = np.random.randint(1, n)
     G = nx.generators.random_graphs.barabasi_albert_graph(n,m)
     newG = nx.Graph()
     for node in G.nodes():
         t = np.random.uniform()
-        for i in range(alpha.size-1):
-            if t < theta[i+1]:
+        for i in range(alpha.size):
+            if t < theta[i]:
                 newG.add_node(node, type=i)
                 f = True
                 break
@@ -84,7 +86,7 @@ while cnt < 100:
         print('error')
     for edge in G.edges():
         newG.add_edge(*edge)
-    write_graph(newG, f, cnt)
+    write_graph(newG, file, cnt)
     cnt = cnt + 1
-f.close()
+file.close()
 
