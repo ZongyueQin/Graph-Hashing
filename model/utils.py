@@ -212,7 +212,7 @@ def encodeTrainingData(sess, model, data_fetcher, placeholders,
     train_graph_num = data_fetcher.get_train_graphs_num()
     inverted_index = {}
     #encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
-    encode_batchsize=1
+    encode_batchsize=FLAGS.ecd_batchsize
     all_codes = []
     all_embs = []
     thres = np.zeros(FLAGS.hash_code_len)
@@ -278,9 +278,11 @@ def encodeTrainingData(sess, model, data_fetcher, placeholders,
             id2emb[gid] = emb
         if use_code:
             id2code[gid] = code
-            
+    bit_weights = sess.run(model.bit_weights)
+    if bit_weights is None:
+        bit_weights = np.ones((FLAGS.hash_code_len))       
     print('finish encoding training data')
-    return inverted_index, id2emb, id2code
+    return inverted_index, id2emb, id2code, bit_weights
 
 def readGroundTruth(f):
     ged_cnt = {}
@@ -338,7 +340,7 @@ def encodeData(sess, model, data_fetcher, graphs, placeholders,use_emb,use_code,
 
         for j in idx_list:
 
-            mg = MyGraph(graphs[j], data_fetcher.node_feat_encoder)
+            mg = MyGraph(graphs[j], data_fetcher.max_label)
 
             wrp_graphs.append(mg)
 

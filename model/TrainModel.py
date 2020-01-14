@@ -35,7 +35,7 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
 
-model_name = "0113_NoSyn_"+FLAGS.dataset
+model_name = "0114_BSS_"+FLAGS.dataset
 model_path = "SavedModel/"+model_name+".ckpt"
 saved_files_dir = "SavedModel"
 
@@ -117,14 +117,14 @@ train_model(sess, model, saver, placeholders, data_fetcher, save_path=model_path
 #saver.restore(sess, model_path)
  
 start_time = time.time()
-#inverted_index, id2emb, id2code = encodeTrainingData(sess, model, 
-#                                                     data_fetcher, 
-#                                                     placeholders,
-#                                                     True, True)
-inverted_index, id2emb, id2code, bit_weights = encodeDataInDir(sess, model,
-                                                  data_fetcher,
-                                                  data_fetcher.train_data_dir,
-                                                  placeholders)
+inverted_index, id2emb, id2code, bit_weights = encodeTrainingData(sess, model, 
+                                                     data_fetcher, 
+                                                     placeholders,
+                                                     True, True)
+#inverted_index, id2emb, id2code, bit_weights = encodeDataInDir(sess, model,
+#                                                  data_fetcher,
+#                                                  data_fetcher.train_data_dir,
+#                                                  placeholders)
 print('encoding data, cost %.5f s'%(time.time()-start_time))
 
 index_file = open('SavedModel/inverted_index_'+model_name+'.pkl', 'wb')

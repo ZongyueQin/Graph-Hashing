@@ -5,7 +5,7 @@ Created in Tue Jul 16 09:20:31 2019
 @author: Zongyue Qin
 """
 import os
-from random import shuffle, sample, randint
+from random import shuffle, sample, randint, choice
 from glob import glob
 import networkx as nx
 import scipy.sparse as sp
@@ -17,6 +17,7 @@ import time
 import subprocess
 import tensorflow as tf
 import xml
+import copy
 
 from nx_to_gxl import nx_to_gxl
 from config import FLAGS
@@ -47,13 +48,17 @@ class DataFetcher:
         self.train_data_dir = os.path.join(self.data_dir,'train')
         self.test_data_dir = os.path.join(self.data_dir, 'test')
         # read graphs
-        train_graphs = self._readGraphs(self.train_data_dir)
+        self.train_file = os.path.join(self.train_data_dir, 'graphs.bss')
+        self.test_file = os.path.join(self.test_data_dir, 'graphs.bss')
+
+        train_graphs, max_label = self._readGraphs(self.train_file)
         #train_graphs = train_graphs[0:FLAGS.batchsize*(1+FLAGS.k)]
 
-        test_graphs = self._readGraphs(self.test_data_dir)
+        test_graphs, max_label_2 = self._readGraphs(self.test_file)
+        self.max_label = max(max_label, max_label_2)
         
-        self.node_feat_encoder = self._create_node_feature_encoder(
-            train_graphs + test_graphs)
+        #self.node_feat_encoder = self._create_node_feature_encoder(
+        #    train_graphs + test_graphs)
 
         self.gid2graph = {}
 
@@ -107,10 +112,10 @@ class DataFetcher:
 
     """ return a training graph's gid """
     def get_train_graph_gid(self, pos):
-        return self.train_graphs[pos].nxgraph.graph['gid']
+        return self.train_graphs[pos].ori_graph['gid']
 
     def get_test_graph_gid(self, pos):
-        return self.test_graphs[pos].nxgraph.graph['gid']
+        return self.test_graphs[pos].ori_graph['gid']
 
     """ return dimension of features """
     def get_node_feature_dim(self):
@@ -217,7 +222,10 @@ class DataFetcher:
         laplacians = self._sparse_to_tuple(laplacians)
         
         # get size of each graph
-        sizes = [g.nxgraph.number_of_nodes() for g in self.sample_graphs]         
+        sizes = [len(g.ori_graph['nodes']) for g in self.sample_graphs]         
+        #for g in self.sample_graphs:
+        #    print(len(g.ori_graph['nodes']))
+        #    print(g.ori_graph['adj_mat'].shape)
         
         self.labels = self.label_transform(self.labels)
         generated_labels = self.label_transform(generated_labels)
@@ -276,6 +284,7 @@ class DataFetcher:
             except subprocess.TimeoutExpired:
                 print('BSS-GED timeout, use Approxmate GED instead')
                 self.labels = self.getApproxGEDForEachPair(self.sample_graphs)
+            os.remove(fname)
 
         return
  
@@ -309,7 +318,7 @@ class DataFetcher:
         laplacians = sp.block_diag([g.laplacian for g in graphs])
         laplacians = self._sparse_to_tuple(laplacians)
         
-        sizes = [g.nxgraph.number_of_nodes() for g in graphs]
+        sizes = [len(g.ori_graph['nodes']) for g in graphs]
         self.batch_node_num = sum(sizes)
                 
         return features, laplacians, sizes
@@ -321,31 +330,72 @@ class DataFetcher:
         return len(self.test_graphs)
     
     """ read *.gexf in graph_dir and return a list of networkx graph """
-    def _readGraphs(self, graph_dir):
+    def _readGraphs(self, graph_file):
         graphs = []
         err_cnt = 0
-        for file in sorted_nicely(glob(graph_dir+'/*.gexf')):
-            if len(graphs) >= self.max_graph_num:
-                print('reach maximal graph num: %d'%self.max_graph_num)
-                break
-            if len(graphs) % 1000 == 0:
-                print('finished {:d} files'.format(len(graphs)))
-            gid = int(os.path.basename(file).split('.')[0])
-            try:
-                g = nx.read_gexf(file)
-            except xml.etree.ElementTree.ParseError:
-                print('err in nx.read_fexf', end = ' ')
-                print(file)
-                err_cnt = err_cnt + 1
-                continue
-            g.graph['gid'] = gid
-            graphs.append(g)
+        f = open(graph_file, 'r')
+        status = 'id'
+        node_left = 0
+        edge_left = 0
+        max_node_label = 0
+        for line in f.readlines():
+            if status == 'id':
+                graph = {}
+                graph['gid'] = int(line)
+                graph['nodes'] = []
+                graph['edges'] = []
+                status = 'cnt'
+            elif status == 'cnt':
+                line = line.split()
+                node_left = int(line[0])
+                edge_left = int(line[1])
+                status = 'node'
+            elif status == 'node':
+                node_label = int(line)
+                if node_label > max_node_label:
+                    max_node_label = node_label
+                graph['nodes'].append(node_label)
+                node_left = node_left - 1
+                if node_left == 0:
+                    node_cnt = len(graph['nodes'])
+                    graph['adj_mat'] = np.zeros((node_cnt, node_cnt))
+                    status = 'edge'
+            elif status == 'edge':
+                line = line.split()
+                f_node = int(line[0])
+                t_node = int(line[1])
+                graph['edges'].append((f_node, t_node))
+                graph['adj_mat'][f_node,t_node]=1
+                graph['adj_mat'][t_node,f_node]=1
+                edge_left = edge_left - 1
+                if edge_left == 0:
+                    graphs.append(graph)
+                    status = 'id'
+                    if len(graphs) % 1000 == 0:
+                        print('finished {:d} files'.format(len(graphs)))
+            else:
+                raise RuntimeError('Unrecognized status: '+status)
+        # print('%d error occured'%err_cnt)
+        return graphs, max_node_label
+#        for file in sorted_nicely(glob(graph_dir+'/*.gexf')):
+#            if len(graphs) >= self.max_graph_num:
+#                print('reach maximal graph num: %d'%self.max_graph_num)
+#                break
+#            gid = int(os.path.basename(file).split('.')[0])
+#            try:
+#                g = nx.read_gexf(file)
+#            except xml.etree.ElementTree.ParseError:
+#                print('err in nx.read_fexf', end = ' ')
+#                print(file)
+#                err_cnt = err_cnt + 1
+#                continue
+#            g.graph['gid'] = gid
+#            graphs.append(g)
 #            if len(graphs) == FLAGS.batchsize*(1+FLAGS.k):
 #                break
 #            if not nx.is_connected(g):
 #                print('{} not connected'.format(gid))
-        print('%d error occured'%err_cnt)
-        return graphs
+#        return graphs
     
     """ split train_graphs into training set and validation set """
     def _split_train_valid(self, graphs):
@@ -383,13 +433,13 @@ class DataFetcher:
         hits = [0, 0.3, 0.6, 0.9]
         cur_hit = 0
         for i, g in enumerate(graphs):
-            mg = MyGraph(g, self.node_feat_encoder)
+            mg = MyGraph(g, self.max_label)
             perc = i / len(graphs)
             if cur_hit < len(hits) and abs(perc - hits[cur_hit]) <= 0.05:
                 print('{} {}/{}={:.1%}'.format(tvt, i, len(graphs), i / len(graphs)))
                 cur_hit += 1
             rtn.append(mg)
-            self.gid2graph[mg.nxgraph.graph['gid']] = mg
+            self.gid2graph[mg.ori_graph['gid']] = mg
         return rtn
 
     """Convert sparse matrix to tuple representation."""
@@ -411,65 +461,66 @@ class DataFetcher:
         return sparse_mx
 
     def getApproxGEDForEachPair(self, graphs):
+        pass
 
-        n = len(graphs)
-        geds = np.zeros((n,n))
-        collection_file = os.path.join('tmpfile',
-                                        str(time.time())+'.xml')
-        f = open(collection_file, 'w')
-        f.write('<?xml version="1.0"?>\n<GraphCollection>\n<graphs>\n')        
-        fnames = []
-        for g in graphs:
-            fname = os.path.join('tmpfile',
-                                 str(time.time())+\
-                                 str(g.nxgraph.graph['gid'])+'.gxl')
+        #n = len(graphs)
+        #geds = np.zeros((n,n))
+        #collection_file = os.path.join('tmpfile',
+                                        #str(time.time())+'.xml')
+        #f = open(collection_file, 'w')
+        #f.write('<?xml version="1.0"?>\n<GraphCollection>\n<graphs>\n')        
+        #fnames = []
+        #for g in graphs:
+        #    fname = os.path.join('tmpfile',
+        #                         str(time.time())+\
+        #                         str(g.ori_graph.graph['gid'])+'.gxl')
 
-            nx_to_gxl(g.nxgraph, g.nxgraph.graph['gid'], fname)
-            f.write('<print file="{}"/>\n'.format(fname))
-            fnames.append(fname)     
+         #   nx_to_gxl(g.nxgraph, g.nxgraph.graph['gid'], fname)
+         #   f.write('<print file="{}"/>\n'.format(fname))
+         #   fnames.append(fname)     
             
-        f.write('</graphs>\n</GraphCollection>')
-        f.close()
-        ged_1 = subprocess.check_output(['java', '-cp', 
-                                         'graph-matching-toolkit/src',
-                                         'algorithms.GraphMatching',
-                                         self.data_dir+'/prop/VJ.prop',
-                                         collection_file, 
-                                         collection_file])
+        #f.write('</graphs>\n</GraphCollection>')
+        #f.close()
+        #ged_1 = subprocess.check_output(['java', '-cp', 
+        #                                 'graph-matching-toolkit/src',
+        #                                 'algorithms.GraphMatching',
+        #                                 self.data_dir+'/prop/VJ.prop',
+        #                                 collection_file, 
+        #                                 collection_file])
     
-        ged_2 = subprocess.check_output(['java', '-cp', 
-                                         'graph-matching-toolkit/src',
-                                         'algorithms.GraphMatching',
-                                         self.data_dir+'/prop/beam.prop',
-                                         collection_file, 
-                                         collection_file])
+        #ged_2 = subprocess.check_output(['java', '-cp', 
+        #                                 'graph-matching-toolkit/src',
+        #                                 'algorithms.GraphMatching',
+        #                                 self.data_dir+'/prop/beam.prop',
+        #                                 collection_file, 
+        #                                 collection_file])
     
-        ged_3 = subprocess.check_output(['java', '-cp', 
-                                         'graph-matching-toolkit/src',
-                                         'algorithms.GraphMatching',
-                                         self.data_dir+'/prop/hungarian.prop',
-                                         collection_file, 
-                                         collection_file])
+        #ged_3 = subprocess.check_output(['java', '-cp', 
+        #                                 'graph-matching-toolkit/src',
+        #                                 'algorithms.GraphMatching',
+        #                                 self.data_dir+'/prop/hungarian.prop',
+        #                                 collection_file, 
+        #                                 collection_file])
   
-        ged_1_list = ged_1.split()
-        ged_2_list = ged_2.split()
-        ged_3_list = ged_3.split()
-        for i in range(n):
-            for j in range(i + 1, n, 1):
-                ged = min([float(ged_1_list[i*n+j]), float(ged_1_list[j*n+i]),
-                           float(ged_2_list[i*n+j]), float(ged_2_list[j*n+i]),
-                           float(ged_3_list[i*n+j]), float(ged_3_list[j*n+i]),
-                           FLAGS.GED_threshold])
-                geds[i,j] = ged    
-                geds[j,i] = ged
+        #ged_1_list = ged_1.split()
+        #ged_2_list = ged_2.split()
+        #ged_3_list = ged_3.split()
+        #for i in range(n):
+        #    for j in range(i + 1, n, 1):
+        #        ged = min([float(ged_1_list[i*n+j]), float(ged_1_list[j*n+i]),
+        #                   float(ged_2_list[i*n+j]), float(ged_2_list[j*n+i]),
+        #                   float(ged_3_list[i*n+j]), float(ged_3_list[j*n+i]),
+        #                   FLAGS.GED_threshold])
+        #        geds[i,j] = ged    
+        #        geds[j,i] = ged
     
-        os.remove(collection_file)
-        for fname in fnames:
-            os.remove(fname)
+        #os.remove(collection_file)
+        #for fname in fnames:
+        #    os.remove(fname)
         
-        return geds
+        #return geds
 
-    def getLabelForPair(self, g1, g2):
+    def getGEDForPair(self, g1, g2):
         
         g1_fname = self.writeGraph2TempFile(g1)
         g2_fname = self.writeGraph2TempFile(g2)
@@ -491,7 +542,7 @@ class DataFetcher:
         if id2 >= id1:
             return
 
-        ged = self.getLabelForPair(self.sample_graphs[id1], 
+        ged = self.getGEDForPair(self.sample_graphs[id1], 
                                    self.sample_graphs[id2])
         
         if ged > -1:
@@ -508,98 +559,109 @@ class DataFetcher:
         f = open(fname, 'w')
 
         for graph in self.sample_graphs:
-            nxgraph = graph.nxgraph
-            string = '{:d}\n{:d} {:d}\n'.format(nxgraph.graph['gid'], 
-                                          len(nxgraph.nodes()), 
-                                          len(nxgraph.edges()))
+            ori_graph = graph.ori_graph
+            string = '{:d}\n{:d} {:d}\n'.format(ori_graph['gid'], 
+                                          len(ori_graph['nodes']), 
+                                          len(ori_graph['edges']))
             f.write(string)
-            label2node = {}
+            #label2node = {}
         
-            for i,n in enumerate(nxgraph.nodes(data=True)):
-                if self.node_feat_name is None:
-                    label2node[n[1][self.node_label_name]] = i
-                    f.write('1\n')
-                else:
-                    if n[1][self.node_feat_name] not in self.type_hash.keys():
-                        self.type_hash[n[1][self.node_feat_name]] = self.typeCnt
-                        self.typeCnt = self.typeCnt + 1
-                    if self.node_label_name != 'none':
-                        label2node[n[1][self.node_label_name]] = i
-                    f.write(str(self.type_hash[n[1][self.node_feat_name]])+'\n')
-        
-            for e in nxgraph.edges():
-                if self.node_label_name == 'none':
-                    f.write(str(e[0])+' '+str(e[1])+' 0\n')                
-                else:
-                    f.write(str(label2node[e[0]]) + ' ' + str(label2node[e[1]]) + ' 0\n')
+            #for i,n in enumerate(nxgraph.nodes(data=True)):
+            #    if self.node_feat_name is None:
+            #        label2node[n[1][self.node_label_name]] = i
+            #        f.write('1\n')
+            #    else:
+            #        if n[1][self.node_feat_name] not in self.type_hash.keys():
+            #            self.type_hash[n[1][self.node_feat_name]] = self.typeCnt
+            #            self.typeCnt = self.typeCnt + 1
+            #        if self.node_label_name != 'none':
+            #            label2node[n[1][self.node_label_name]] = i
+            #        f.write(str(self.type_hash[n[1][self.node_feat_name]])+'\n')
+            for n in ori_graph['nodes']:
+                f.write('%d\n'%n)
+
+            for e in ori_graph['edges']:
+                f.write('%d %d 0\n'%(e[0],e[1]))
+#            for e in nxgraph.edges():
+#                if self.node_label_name == 'none':
+#                    f.write(str(e[0])+' '+str(e[1])+' 0\n')                
+#                else:
+#                    f.write(str(label2node[e[0]]) + ' ' + str(label2node[e[1]]) + ' 0\n')
 
         f.close()
         return fname
 
  
     def writeGraphList2TempFile(self, gid_list):
+        raise RuntimeError('writeGraphList2TempFile unimplemented')
+        #fname = 'tmpfile/'+str(time.time()) +  '.tmpfile'
+        #f = open(fname, 'w')
 
-        fname = 'tmpfile/'+str(time.time()) +  '.tmpfile'
-        f = open(fname, 'w')
-
-        for gid in gid_list:
-            graph = self.gid2graph[gid]
-            nxgraph = graph.nxgraph
-            string = '{:d}\n{:d} {:d}\n'.format(nxgraph.graph['gid'], 
-                                          len(nxgraph.nodes()), 
-                                          len(nxgraph.edges()))
-            f.write(string)
-            label2node = {}
+        #for gid in gid_list:
+        #    graph = self.gid2graph[gid]
+        #    nxgraph = graph.nxgraph
+        #    string = '{:d}\n{:d} {:d}\n'.format(nxgraph.graph['gid'], 
+        #                                  len(nxgraph.nodes()), 
+        #                                  len(nxgraph.edges()))
+        #    f.write(string)
+        #    label2node = {}
         
-            for i,n in enumerate(nxgraph.nodes(data=True)):
-                if self.node_feat_name is None:
-                    label2node[n[1][self.node_label_name]] = i
-                    f.write('1\n')
-                else:
-                    if n[1][self.node_feat_name] not in self.type_hash.keys():
-                        self.type_hash[n[1][self.node_feat_name]] = self.typeCnt
-                        self.typeCnt = self.typeCnt + 1
-                    if self.node_label_name != 'none':
-                        label2node[n[1][self.node_label_name]] = i
-                    f.write(str(self.type_hash[n[1][self.node_feat_name]])+'\n')
-        
-            for e in nxgraph.edges():
-                if self.node_label_name == 'none':
-                    f.write(str(e[0])+' '+str(e[1])+' 0\n')                
-                else:
-                    f.write(str(label2node[e[0]]) + ' ' + str(label2node[e[1]]) + ' 0\n')
+        #    for i,n in enumerate(nxgraph.nodes(data=True)):
+        #        if self.node_feat_name is None:
+        #            label2node[n[1][self.node_label_name]] = i
+        #            f.write('1\n')
+        #        else:
+        #            if n[1][self.node_feat_name] not in self.type_hash.keys():
+        #                self.type_hash[n[1][self.node_feat_name]] = self.typeCnt
+        #                self.typeCnt = self.typeCnt + 1
+        #            if self.node_label_name != 'none':
+        #                label2node[n[1][self.node_label_name]] = i
+        #            f.write(str(self.type_hash[n[1][self.node_feat_name]])+'\n')
+        #
+        #    for e in nxgraph.edges():
+        #        if self.node_label_name == 'none':
+        #            f.write(str(e[0])+' '+str(e[1])+' 0\n')                
+        #        else:
+        #            f.write(str(label2node[e[0]]) + ' ' + str(label2node[e[1]]) + ' 0\n')
 
-        f.close()
-        return fname
+        #f.close()
+        #return fname
  
 
     def writeGraph2TempFile(self, graph):
-        nxgraph = graph.nxgraph
+        nxgraph = graph.ori_graph
         fname = 'tmpfile/'+str(time.time()) + '_'+str(nxgraph.graph['gid']) + '.tmpfile'
         f = open(fname, 'w')
-        string = '{:d}\n{:d} {:d}\n'.format(nxgraph.graph['gid'], 
-                                          len(nxgraph.nodes()), 
-                                          len(nxgraph.edges()))
+        string = '{:d}\n{:d} {:d}\n'.format(ori_graph['gid'], 
+                                          len(ori_graph['nodes']), 
+                                          len(ori_graph['edges']))
         f.write(string)
         label2node = {}
+ 
+        for n in ori_graph['nodes']:
+            f.write('%d\n'%n)
+
         
-        for i,n in enumerate(nxgraph.nodes(data=True)):
-            if self.node_feat_name is None:
-                label2node[n[1][self.node_label_name]] = i
-                f.write('1\n')
-            else:
-                if n[1][self.node_feat_name] not in self.type_hash.keys():
-                    self.type_hash[n[1][self.node_feat_name]] = self.typeCnt
-                    self.typeCnt = self.typeCnt + 1
-                if self.node_label_name != 'none':
-                    label2node[n[1][self.node_label_name]] = i
-                f.write(str(self.type_hash[n[1][self.node_feat_name]])+'\n')
-        
-        for e in nxgraph.edges():
-            if self.node_label_name == 'none':
-                f.write(str(e[0])+' '+str(e[1])+' 0\n')                
-            else:
-                f.write(str(label2node[e[0]]) + ' ' + str(label2node[e[1]]) + ' 0\n')
+        for e in ori_graph['edges']:
+            f.write('%d %d 0\n'%(e[0],e[1]))
+#       
+#        for i,n in enumerate(nxgraph.nodes(data=True)):
+#            if self.node_feat_name is None:
+#                label2node[n[1][self.node_label_name]] = i
+#                f.write('1\n')
+#            else:
+#                if n[1][self.node_feat_name] not in self.type_hash.keys():
+#                    self.type_hash[n[1][self.node_feat_name]] = self.typeCnt
+#                    self.typeCnt = self.typeCnt + 1
+#                if self.node_label_name != 'none':
+#                    label2node[n[1][self.node_label_name]] = i
+#                f.write(str(self.type_hash[n[1][self.node_feat_name]])+'\n')
+#        
+#        for e in nxgraph.edges():
+#            if self.node_label_name == 'none':
+#                f.write(str(e[0])+' '+str(e[1])+' 0\n')                
+#            else:
+#                f.write(str(label2node[e[0]]) + ' ' + str(label2node[e[1]]) + ' 0\n')
 
         f.close()
         return fname
@@ -616,7 +678,7 @@ class DataFetcher:
         generated_graphs = []
         geds = []
         for i in range(k):
-            tmp_g = g.nxgraph.copy()
+            tmp_g = copy.deepcopy(g.ori_graph)
             # sample how many edit operation to perform
         #    op_num = randint(1,7)#FLAGS.GED_threshold-2)
         #    if op_num  == 7:
@@ -631,15 +693,14 @@ class DataFetcher:
                 # randomly select a operation and do it
                 # 0: change node label, 1: insert edge, 2: delete edge
                 # 3: insert node; 4: delete node
-                can_delete_node = self.has_degree_one_node(tmp_g)
+                can_delete_node = self.has_isolate_node(tmp_g)
                 # couldn't delete edge when only one node left
-                op_cannot_be_2 = len(tmp_g.edges()) == 0
+                op_cannot_be_2 = len(tmp_g['edges']) == 0
                 
                 
-                op = randint(0, 3)
+                op = randint(0, 4)
                 while (can_delete_node is False and op == 4) or\
                 (op == 0 and 'constant' in self.node_feat_type) or\
-                (op >= 3 and j == op_num - 1) or\
                 (op_cannot_be_1 and op == 1) or\
                 (op_cannot_be_2 and op == 2):
                     op = randint(0, 4)
@@ -676,43 +737,49 @@ class DataFetcher:
                     
                     
                 j = j + 1
-                    
-            generated_graphs.append(MyGraph(tmp_g, self.node_feat_encoder))   
+            generated_graphs.append(MyGraph(tmp_g, self.max_label))   
 
         return generated_graphs, geds
     
-    def has_degree_one_node(self, g):
-        for d in g.degree().values():
-            if d == 1:
-                return True
-        return False
+    def has_isolate_node(self, g):
+        non_isolate_nodes = set()
+        for e in g['edges']:
+            non_isolate_nodes.add(e[0])
+            non_isolate_nodes.add(e[1])
+        return len(non_isolate_nodes) != len(g['nodes'])
 
     def random_change_node_label(self, g):
-        node = sample(g.node.keys(),1)[0]
-        old_feat = g.node[node][self.node_feat_name]
+        idx = randint(0, len(g['nodes'])-1)
+        old_feat = g['nodes'][idx]
         new_feat = old_feat
         while new_feat == old_feat:
-            new_feat = sample(self.node_feat_encoder.feat_idx_dic.keys(), 1)[0]
-        g.node[node][self.node_feat_name] = new_feat
+            new_feat = randint(0, self.max_label)
+        g['nodes'][idx] = new_feat
         
         return
     
     def random_insert_edge(self, g):
-        old_edge_num = len(g.edges())
-        n = len(g.nodes())
+        old_edge_num = len(g['edges'])
+        n = len(g['nodes'])
         if old_edge_num >= n*(n-1)/2:
             return False
-        
-        while len(g.edges()) == old_edge_num:
-            nodes = sample(g.node.keys(), 2)
-            g.add_edge(nodes[0], nodes[1])
+
+        f_node = randint(0,n-1)
+        t_node = randint(0,n-1)
+        while f_node == t_node or g['adj_mat'][f_node,t_node]!=0:
+            f_node = randint(0,n-1)
+            t_node = randint(0,n-1)
+        g['edges'].append((f_node, t_node))
+        g['adj_mat'][f_node,t_node]=1
+        g['adj_mat'][t_node,f_node]=1
             
         return True
     
     def random_delete_edge(self, g):
-        e = sample(g.edges(), 1)[0]
-        g.remove_edge(*e)
-        sample_cnt = 0
+        e = choice(g['edges'])
+        g['edges'].remove(e)
+        g['adj_mat'][e[0],e[1]]=0
+        g['adj_mat'][e[1],e[0]]=0
         """
         while not nx.is_connected(g):
             g.add_edge(*e)
@@ -721,33 +788,49 @@ class DataFetcher:
                 break
             e = sample(g.edges(), 1)[0]
             g.remove_edge(*e)"""
-        return sample_cnt <= 100
+        return True
     
     def random_insert_node(self, g):
         # randomly select a node to add edge to
-        node = sample(g.node.keys(),1)[0]
-        node_label = str(time.time())
-        attri = {}
-        if self.node_feat_type == 'onehot':
-            attri[self.node_feat_name] = sample(\
-                 self.node_feat_encoder.feat_idx_dic.keys(),1)[0]
-        if self.node_label_name != 'none':
-            attri[self.node_label_name] = node_label
-        g.add_node(node_label, attr_dict=attri)
-        g.add_edge(node, node_label)
+        node_label = randint(0, self.max_label)
+        g['nodes'].append(node_label)
+        n = len(g['nodes'])
+        newMat = np.zeros((n,n))
+        newMat[0:n-1,0:n-1]=g['adj_mat']
+        g['adj_mat']=newMat
+        assert(len(g['nodes'])==g['adj_mat'].shape[0])
+#        node = sample(g.node.keys(),1)[0]
+#        node_label = str(time.time())
+#        attri = {}
+#        if self.node_feat_type == 'onehot':
+#            attri[self.node_feat_name] = sample(\
+#                 self.node_feat_encoder.feat_idx_dic.keys(),1)[0]
+#        if self.node_label_name != 'none':
+#            attri[self.node_label_name] = node_label
+#        g.add_node(node_label, attr_dict=attri)
+#        g.add_edge(node, node_label)
         return
     
     def random_delete_node(self, g):
         # find all nodes with 0 degree
-        deg = g.degree()
-        candidate_nodes = []
-        for n in deg.keys():
-            if deg[n] == 1:
-                candidate_nodes.append(n)
+#        deg = g.degree()
+#        candidate_nodes = []
+#        for n in deg.keys():
+#            if deg[n] == 1:
+#                candidate_nodes.append(n)
+        non_isolate_nodes = set()
+
+        for e in g['edges']:
+            non_isolate_nodes.add(e[0])
+            non_isolate_nodes.add(e[1])
+
+        candidate_nodes = set(range(len(g['nodes'])))-non_isolate_nodes
         if len(candidate_nodes) == 0:
             raise RuntimeError('All nodes\' degree larger than 0, cannot delete')
-
-        n = sample(candidate_nodes, 1)[0]
-        g.remove_node(n)
+        i = choice(list(candidate_nodes))
+        del g['nodes'][i]
+        newMat = np.delete(g['adj_mat'],i,axis=0)
+        newMat = np.delete(newMat, i, axis=1)
+        g['adj_mat'] = newMat
         return
 

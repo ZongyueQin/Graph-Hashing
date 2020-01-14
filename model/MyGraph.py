@@ -10,31 +10,32 @@ import numpy as np
     Parts of the code refer to https://github.com/tkipf/gcn """
 
 class MyGraph(object):
+    def __init__(self, graph, max_label):
 
-    
-
-    def __init__(self, nxgraph, node_feat_encoder):
-
-        self.nxgraph = nxgraph
-
-        adj_mat = nx.to_scipy_sparse_matrix(nxgraph)
-
-        dense_node_inputs = node_feat_encoder.encode(nxgraph)
-
+        self.ori_graph = graph
+        assert(len(graph['nodes'])==graph['adj_mat'].shape[0])
+        adj_mat = sp.csr_matrix(graph['adj_mat'])
+#        adj_mat = nx.to_scipy_sparse_matrix(nxgraph)
+        dense_node_inputs = self.encode(graph, max_label)
+        #dense_node_inputs = node_feat_encoder.encode(nxgraph)
         # TODO probably add ordering
-
-        
-
         self.sparse_node_inputs = self._preprocess_inputs(
-
                 sp.csr_matrix(dense_node_inputs))
-
-        
-
         self.laplacian = self._preprocess_adj(adj_mat)
 
-    
-
+    def encode(self, graph, max_label):
+        n = len(graph['nodes'])
+        if FLAGS.node_feat_encoder == 'onehot':
+            feature = np.zeros((n, max_label+1))
+            for i,l in enumerate(graph['nodes']):
+                feature[i,l] = 1
+        elif 'constant' in FLAGS.node_feat_encoder:
+            input_dim_ = int(FLAGS.node_feat_encoder.split('_')[1])
+            const = float(2.0)
+            feature = np.full((n, input_dim_), const)
+        else:
+            raise RuntimeError('Unknown node_feat_encoder {}'.format(FLAGS.node_feat_encoder))
+        return feature
         
 
     def _preprocess_inputs(self, inputs):
