@@ -15,7 +15,7 @@ config.gpu_options.allow_growth = True
 
 
 """ Load datafetcher only to get node_feature_dim, probably should use more efficient way to do that in future """
-data_fetcher = DataFetcher(dataset=FLAGS.dataset, exact_ged=True, wrp_train_graph = False)
+data_fetcher = DataFetcher(dataset=FLAGS.dataset, exact_ged=True, wrp_train_graph = True)
 node_feature_dim = data_fetcher.get_node_feature_dim()
 # Define placeholders
 placeholders = {
@@ -61,7 +61,7 @@ def getCodeAndEmbByQid(qid):
     laplacian = query_graph.laplacian
     laplacian = data_fetcher._sparse_to_tuple(laplacian)
     
-    size = [query_graph.nxgraph.number_of_nodes()]
+    size = [len(query_graph.ori_graph['nodes'])]
 
     code, emb = getCodeAndEmb(features, laplacian, size)
     code = tupleCode2IntegerCode(code[0])
