@@ -89,7 +89,7 @@ def getCodeAndEmbByQid(qid):
     size = [len(query_graph.ori_graph['nodes'])]
 
     code, emb = getCodeAndEmb(features, laplacian, size)
-    code = tupleCode2IntegerCode(code[0])
+#    code = tupleCode2IntegerCode(code[0])
 #    print(code)
 #    print('done')
 #    print(tuple(emb[0]))
@@ -128,14 +128,14 @@ f = open(output_fname, 'w')
 # compute estimated ged
 for qid in list(qids):
     ret = getCodeAndEmbByQid(qid)
-    q_code = np.array(ret[0])
+    q_code = np.array(ret[0], dtype=np.int32)
     q_emb = np.array(ret[1])
     for g in data_fetcher.train_graphs:
         gid = g.ori_graph['gid']
         real_ged = ground_truth[(qid, gid)]
         if real_ged >= MinGED and real_ged <= MaxGED:
             g_emb = np.array(id2emb[gid])
-            g_code = np.array(id2code[gid])
+            g_code = np.array(id2code[gid], dtype=np.int32)
             ged_by_code = np.sum((q_code-g_code)**2)
             ged_by_emb = np.sum((q_emb-g_emb)**2)
             f.write(str(real_ged)+' '+str(ged_by_code)+' '+str(ged_by_emb)+'\n')
