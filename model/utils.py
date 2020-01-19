@@ -207,12 +207,15 @@ def writeInvertedIndex(filename, index, embLen = FLAGS.hash_code_len):
 """ encode training data with model that outputs both continuous embedding
     and discrete code """
 def encodeTrainingData(sess, model, data_fetcher, placeholders,
-                       use_emb=True, use_code=True):
+                       use_emb=True, use_code=True, ecd_bs=-1):
     print('start encoding training data...')
     train_graph_num = data_fetcher.get_train_graphs_num()
     inverted_index = {}
     #encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
-    encode_batchsize=FLAGS.ecd_batchsize
+    if ecd_bs == -1:
+        encode_batchsize=FLAGS.ecd_batchsize
+    else:
+        encode_batchsize = ecd_bs
     all_codes = []
     all_embs = []
     thres = np.zeros(FLAGS.hash_code_len)

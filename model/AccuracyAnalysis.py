@@ -6,11 +6,11 @@ import sys
 import random
 
 from utils import *
-from graphHashFunctions import GraphHash_Emb_Code_Mapper, GraphHash_Emb_Code
+from graphHashFunctions import GraphHash_Emb_Code
 from config import FLAGS
 from DataFetcher import DataFetcher
 
-os.environ['CUDA_VISIBLE_DEVICES']='6,7'
+os.environ['CUDA_VISIBLE_DEVICES']='2,3'
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
@@ -43,7 +43,7 @@ print('done')
 
 """ Load datafetcher and model"""
 print('restoring model...')
-data_fetcher = DataFetcher(dataset=FLAGS.dataset, exact_ged=True, True)
+data_fetcher = DataFetcher(dataset=FLAGS.dataset, exact_ged=True)
 node_feature_dim = data_fetcher.get_node_feature_dim()
 # Define placeholders
 placeholders = {
@@ -86,7 +86,7 @@ def getCodeAndEmbByQid(qid):
     laplacian = query_graph.laplacian
     laplacian = data_fetcher._sparse_to_tuple(laplacian)
     
-    size = [query_graph.nxgraph.number_of_nodes()]
+    size = [len(query_graph.ori_graph['nodes'])]
 
     code, emb = getCodeAndEmb(features, laplacian, size)
     code = tupleCode2IntegerCode(code[0])
@@ -120,8 +120,8 @@ def getCodeAndEmb(features, laplacian, size):
     return code, emb
  
 # encoding training data
-_, id2emb, id2code = encodeTrainingData(sess, model, data_fetcher,
-                                        placeholders, True, True)
+_, id2emb, id2code, bit_weights = encodeTrainingData(sess, model, data_fetcher,
+                                        placeholders, True, True, 1)
 
 f = open(output_fname, 'w')
 
@@ -131,7 +131,7 @@ for qid in list(qids):
     q_code = np.array(ret[0])
     q_emb = np.array(ret[1])
     for g in data_fetcher.train_graphs:
-        gid = g.nxgraph.graph['gid']
+        gid = g.ori_graph['gid']
         real_ged = ground_truth[(qid, gid)]
         if real_ged >= MinGED and real_ged <= MaxGED:
             g_emb = np.array(id2emb[gid])

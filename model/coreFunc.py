@@ -15,7 +15,7 @@ config.gpu_options.allow_growth = True
 
 
 """ Load datafetcher only to get node_feature_dim, probably should use more efficient way to do that in future """
-data_fetcher = DataFetcher(dataset=FLAGS.dataset, exact_ged=True, wrp_train_graph = True)
+data_fetcher = DataFetcher(dataset=FLAGS.dataset, exact_ged=True, wrp_train_graph = False)
 node_feature_dim = data_fetcher.get_node_feature_dim()
 # Define placeholders
 placeholders = {

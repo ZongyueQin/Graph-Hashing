@@ -22,13 +22,13 @@ elif dataset == 'FULL_ALCHEMY':
     flags.DEFINE_string('dataset', 'FULL_ALCHEMY', 'Dataset string')
     flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
     flags.DEFINE_string('node_feat_name','atom','Name of node feature')
-elif dataset == 'Syn-BA':
-    flags.DEFINE_string('dataset', 'Syn-BA', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
+elif dataset == 'BA':
+    flags.DEFINE_string('dataset', 'BA','Dataset string.')  # 'cora', 'citeseer', 'pubmed'
     flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
     flags.DEFINE_string('node_feat_name','type','Name of node feature')
 else:
     # You should define your own corresponding attributes here
-    flags.DEFINE_string('dataset', 'Syn-ER', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
+    flags.DEFINE_string('dataset', 'ER', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
     flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
     flags.DEFINE_string('node_feat_name','type','Name of node feature')
 

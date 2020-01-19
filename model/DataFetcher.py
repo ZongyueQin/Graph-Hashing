@@ -28,10 +28,10 @@ class DataFetcher:
     """ Represents a set of data """
     
     """ read training graphs and test graphs """
-    def __init__(self, dataset, max_graph_num = 1000000,
+    def __init__(self, dataset, max_graph_num = 10000000,
                  exact_ged = False, wrp_train_graph = True,
                  label_transform = lambda x: x):
-        self.max_graph_num = 1000000
+        self.max_graph_num = max_graph_num
         self.exact_ged = exact_ged
         self.label_transform = label_transform
         # a helper object to map features to consecutive integer
@@ -359,7 +359,10 @@ class DataFetcher:
                 if node_left == 0:
                     node_cnt = len(graph['nodes'])
                     graph['adj_mat'] = np.zeros((node_cnt, node_cnt))
-                    status = 'edge'
+                    if edge_left > 0:
+                        status = 'edge'
+                    else:
+                        status = 'id'
             elif status == 'edge':
                 line = line.split()
                 f_node = int(line[0])
