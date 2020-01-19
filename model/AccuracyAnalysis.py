@@ -15,7 +15,7 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
 MinGED = 0
-MaxGED = 9
+MaxGED = 11
 
 if len(sys.argv) != 4:
     print('parameters are GT_fname, model_path, output_fname')
