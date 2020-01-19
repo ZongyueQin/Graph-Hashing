@@ -15,7 +15,7 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
 MinGED = 0
-MaxGED = 3
+MaxGED = 9
 
 if len(sys.argv) != 4:
     print('parameters are GT_fname, model_path, output_fname')
@@ -126,6 +126,7 @@ _, id2emb, id2code, bit_weights = encodeTrainingData(sess, model, data_fetcher,
 f = open(output_fname, 'w')
 
 # compute estimated ged
+cnt = np.zeros((MaxGED-MinGED+1,12))
 for qid in list(qids):
     ret = getCodeAndEmbByQid(qid)
     q_code = np.array(ret[0], dtype=np.int32)
@@ -138,7 +139,15 @@ for qid in list(qids):
             g_code = np.array(id2code[gid], dtype=np.int32)
             ged_by_code = np.sum((q_code-g_code)**2)
             ged_by_emb = np.sum((q_emb-g_emb)**2)
-            f.write(str(real_ged)+' '+str(ged_by_code)+' '+str(ged_by_emb)+'\n')
+#            f.write(str(real_ged)+' '+str(ged_by_code)+' '+str(ged_by_emb)+'\n')
+            if ged_by_code > 11:
+                ged_by_code = 11
+            cnt[real_ged-MinGED,ged_by_code]=cnt[real_ged-MinGED,ged_by_code]+1
+
+for i in range(MinGED,MaxGED+1):
+    for j in range(12):
+        f.write('%d '%cnt[i-MinGED,j])
+    f.write('\n')
 f.close()
 
 
