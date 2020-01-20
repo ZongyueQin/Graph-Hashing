@@ -9,7 +9,7 @@ public:
 	uint64_t code;
 	double dist;
 	int last_flip_pos;
-	SearchNode(uint64_t c, int d, int l)
+	SearchNode(uint64_t c, double d, int l)
 	{
 		code = c; dist=d; last_flip_pos = l;
 	}
