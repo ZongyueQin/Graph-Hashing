@@ -7,9 +7,11 @@ class SearchNode
 {
 public:
 	uint64_t code;
-	double dist;
+//	double dist;
+	int dist;
 	int last_flip_pos;
-	SearchNode(uint64_t c, double d, int l)
+//	SearchNode(uint64_t c, double d, int l)
+	SearchNode(uint64_t c, int d, int l)
 	{
 		code = c; dist=d; last_flip_pos = l;
 	}
@@ -127,24 +129,25 @@ void getAllValidCode(uint64_t code, int thres,
 			res.push_back(idx);
 //			fprintf(stdout, "%d\n", index[idx].code);
 		}
-//#ifdef LOOSE
-//		if (curNode.dist <= (double) thres)
-//#else
-//		if (curNode.dist < (double) thres)
-//#endif
-//		{
+#ifdef LOOSE
+		if (curNode.dist <=  thres)
+#else
+		if (curNode.dist <  thres)
+#endif
+		{
 			int pow = curNode.last_flip_pos + 1;
 			for(; pow < codeLen; pow++)
 			{
 //				if (bit_weights[pow]!=1) cout << "error " << pow << ' ' << bit_weights[pow] << endl;
-				if (curNode.dist + bit_weights[pow] >= thres)
+				//if (curNode.dist + bit_weights[pow] >= thres)
 					continue;
 				uint64_t mask = (1 << pow);
 				uint64_t newCode = curNode.code ^ mask;
-				que.push(SearchNode(newCode, curNode.dist+bit_weights[pow], 
-							pow));
+				//que.push(SearchNode(newCode, curNode.dist+bit_weights[pow], 
+				que.push(SearchNode(newCode, curNode.dist+1,
+					pow));
 			}			
-//		}
+		}
 	}
     
 } 
