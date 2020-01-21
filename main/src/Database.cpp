@@ -1,5 +1,6 @@
 #include "Database.h"
 
+#define BITWEIGHT
 using namespace std;
 
 /* Search Node class used when searching for possible codes */
@@ -7,11 +8,18 @@ class SearchNode
 {
 public:
 	uint64_t code;
-//	double dist;
+#ifdef BITWEIGHT
+	double dist;
+#else
 	int dist;
+#endif
 	int last_flip_pos;
-//	SearchNode(uint64_t c, double d, int l)
+
+#ifdef BITWEIGHT
+	SearchNode(uint64_t c, double d, int l)
+#else
 	SearchNode(uint64_t c, int d, int l)
+#endif
 	{
 		code = c; dist=d; last_flip_pos = l;
 	}
@@ -82,14 +90,26 @@ uint64_t computeSearchSpace(int codeLen, int thres)
 }
 
 /* Compute hamming distance between two codes */
+#ifndef BITWEIGHT
 uint64_t getHammingDistance(uint64_t a, uint64_t b, int len)
+#else
+double getHammingDistance(uint64_t a, uint64_t b, int len, double *weights)
+#endif
 {
 	uint64_t diff= a ^ b;
+#ifdef BITWEIGHT
+	double ret = 0;
+#else
 	uint64_t ret = 0;
+#endif
 	for(int i = 0; i < len; i++)
 	{
 		uint64_t bit = ((diff >> i) & 0x1);
-		ret += bit;
+#ifdef BITWEIGHT
+		ret += ((double)bit)*weights[i];
+#else
+		ret += 1;
+#endif
 	}
 	return ret;
 }
@@ -97,7 +117,8 @@ uint64_t getHammingDistance(uint64_t a, uint64_t b, int len)
 /* search a CodePos array to find all codes whose hamming distance to
  * code is smaller than thres */
 // return is in res, the index (position) in Code2Pos
-void getAllValidCode(uint64_t code, int thres, 
+//void getAllValidCode(uint64_t code, int thres, 
+void getAllValidCode(uint64_t code, int thres,
 				int totalCodeCnt, int codeLen, 
 				CodePos *index, vector<uint64_t> &res,
 				double *bit_weights)
@@ -108,8 +129,13 @@ void getAllValidCode(uint64_t code, int thres,
 		for(int i = 0; i < totalCodeCnt; i++)
 		{
 			uint64_t newCode = index[i].code;
+#ifndef BITWEIGHT
 			uint64_t hammingDistance = getHammingDistance(newCode, code, codeLen);
 			if (hammingDistance <= (uint64_t)thres)
+#else
+			double hammingDistance = getHammingDistance(newCode, code, codeLen, bit_weights);
+			if (hammingDistance <= (double)thres)
+#endif
 				res.push_back(i);
 		}
 		return;
@@ -129,25 +155,35 @@ void getAllValidCode(uint64_t code, int thres,
 			res.push_back(idx);
 //			fprintf(stdout, "%d\n", index[idx].code);
 		}
-#ifdef LOOSE
-		if (curNode.dist <=  thres)
-#else
+#ifndef BITWEIGHT
+//#ifdef LOOSE
+//		if (curNode.dist <=  thres)
+//#else
 		if (curNode.dist <  thres)
-#endif
+//#endif
 		{
+#endif
 			int pow = curNode.last_flip_pos + 1;
 			for(; pow < codeLen; pow++)
 			{
 //				if (bit_weights[pow]!=1) cout << "error " << pow << ' ' << bit_weights[pow] << endl;
-				//if (curNode.dist + bit_weights[pow] >= thres)
+#ifdef BITWEIGHT
+				if (curNode.dist + bit_weights[pow] >= thres)
 					continue;
+#endif
 				uint64_t mask = (1 << pow);
 				uint64_t newCode = curNode.code ^ mask;
-				//que.push(SearchNode(newCode, curNode.dist+bit_weights[pow], 
+#ifdef BITWEIGHT
+				que.push(SearchNode(newCode, curNode.dist+bit_weights[pow], 
+					pow));
+#else
 				que.push(SearchNode(newCode, curNode.dist+1,
 					pow));
+#endif
 			}			
+#ifndef BITWEIGHT
 		}
+#endif
 	}
     
 } 
