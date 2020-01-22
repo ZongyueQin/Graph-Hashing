@@ -4,10 +4,10 @@ flags = tf.app.flags
 FLAGS = flags.FLAGS
 
 #dataset related
-dataset = 'FULL_ALCHEMY'
+dataset = 'linux50'
 
-if dataset == 'linux15':
-    flags.DEFINE_string('dataset', 'linux15', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
+if 'linux' in dataset:
+    flags.DEFINE_string('dataset', dataset,'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
     flags.DEFINE_string('node_feat_encoder','constant_1','How to encode node feature')
     flags.DEFINE_string('node_feat_name',None,'Name of node feature')
 elif dataset == 'ALCHEMY':
@@ -54,7 +54,7 @@ flags.DEFINE_integer('ecd_batchsize', 100, 'encoding batch size')
 flags.DEFINE_string('label_type', 'ged', 'whether training label should be binary or ged')
 
 # loss related
-flags.DEFINE_float('exp_a', 0.2, 'a for exp weight')
+flags.DEFINE_float('exp_a', 0, 'a for exp weight')
 flags.DEFINE_float('weight_decay', 0.00, 'Weight for L2 loss on embedding matrix.')
 #flags.DEFINE_float('DSH_loss_m',24,'parameter m for DSH loss')
 flags.DEFINE_float('binary_regularizer_weight',0.2,'weight for binary regularizer')

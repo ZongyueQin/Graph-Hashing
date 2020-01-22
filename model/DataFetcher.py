@@ -275,7 +275,7 @@ class DataFetcher:
             try:
                 ret = subprocess.check_output(['./ged', fname, g_cnt, fname, g_cnt, 
                                        str(FLAGS.GED_threshold - 1),
-                                       str(FLAGS.beam_width)], timeout=60)
+                                       str(FLAGS.beam_width)])
 
                 geds = [float(ged) for ged in ret.split()][0:-1]
                 geds = np.array(geds)

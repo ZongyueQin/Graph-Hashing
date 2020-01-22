@@ -55,7 +55,7 @@ int main(int argc, char **argv)
 	vector<int> result;
 	vector<int> candidates;
 
-	for(int ub = 0; ub < 5; ub++)
+	for(int ub = 5; ub < 8; ub++)
 	{
 		stringstream ss;
 		ss << "output/" << dataset << "_t=" << ub << "_" << OUTPUTFILE;

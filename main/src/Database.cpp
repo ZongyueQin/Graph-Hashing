@@ -1,6 +1,6 @@
 #include "Database.h"
 
-#define BITWEIGHT
+//#define BITWEIGHT
 using namespace std;
 
 /* Search Node class used when searching for possible codes */
@@ -108,7 +108,7 @@ double getHammingDistance(uint64_t a, uint64_t b, int len, double *weights)
 #ifdef BITWEIGHT
 		ret += ((double)bit)*weights[i];
 #else
-		ret += 1;
+		ret += bit;
 #endif
 	}
 	return ret;
@@ -132,11 +132,12 @@ void getAllValidCode(uint64_t code, int thres,
 #ifndef BITWEIGHT
 			uint64_t hammingDistance = getHammingDistance(newCode, code, codeLen);
 			if (hammingDistance <= (uint64_t)thres)
+				res.push_back(i);
 #else
 			double hammingDistance = getHammingDistance(newCode, code, codeLen, bit_weights);
 			if (hammingDistance <= (double)thres)
-#endif
 				res.push_back(i);
+#endif
 		}
 		return;
 	
