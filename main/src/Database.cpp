@@ -531,6 +531,33 @@ Database::QueryProcessGetCandidate(const int qid, const int ub, const int width,
 
 	return true;
 }
+
+
+bool
+Database::directVerify(const int qid, const int ub, const int width,
+			const graph &q, vector<int> &ret)
+{
+	int i = 0, bound;
+	for(; i < graphDB.size();i++)
+	{
+		graph g = graphDB[i];
+		graph query = q; 
+//		changeLabel(q.V, g.V);
+		if(ub == -1)  bound = max(g.v, q.v) + g.e + q.e;
+		else bound = ub;
+		BSEditDistance ed(width);
+		int ged = ed.getEditDistance(query, g, bound);
+		//cout << ged << endl;
+		if (ged >= 0)
+		{
+			ret.push_back(g.graph_id);
+		}
+		FLAG = true;
+	}
+
+
+}
+
 /**
  * Process Query identifeid by qid, push final results into vector @ret, push 
    filtered candidates into vector @candGid
@@ -643,6 +670,8 @@ Database::QueryProcess(const int qid, const int ub, const int width,
 
 	return true;
 }
+
+
 
 /* used if the number of labels is too much*/
 void changeLabel(vector<int> &v1, vector<int> &v2)

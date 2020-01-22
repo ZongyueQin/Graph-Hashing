@@ -45,6 +45,8 @@ public:
 	bool QueryProcess(const int qid, const int ub, const int width,
 		bool fineGrained, const graph &q, vector<int> &ret, vector<int> &candGid);
 
+	bool directVerify(const int qid, const int ub, const int width,
+			const graph &q, vector<int> &ret);
 	bool topKQueryProcess(const int gid, const int K, vector<uint64_t> &ret, int thres = 11); 
 private:
 	bool Verify(const graph &query, const vector<graph> &candidates, 
