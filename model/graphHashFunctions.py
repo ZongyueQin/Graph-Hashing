@@ -415,8 +415,8 @@ class GraphHash_Emb_Code(Model):
         discrete_layers.append(Dense(input_dim=FLAGS.hidden6,
                                  output_dim=self.output_dim,
                                  placeholders=self.placeholders,
-                                 act=lambda x: x,
-#                                 act = lambda x: 0.5*tf.nn.tanh(x),
+#                                 act=lambda x: x,
+                                 act = lambda x: 0.5*tf.nn.tanh(x),
                                  bias=True,
                                  dropout=FLAGS.dropout>0,
                                  logging=self.logging))

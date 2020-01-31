@@ -11,7 +11,8 @@ using namespace std;
 
 #define CODELEN 32
 #define OUTPUTFILE "output.txt"
-#define dataset "FULL_ALCHEMY"
+#define dataset "NODEG_ER"
+#define PRUNE
 
 int main(int argc, char **argv)
 {
@@ -55,7 +56,7 @@ int main(int argc, char **argv)
 	vector<int> result;
 	vector<int> candidates;
 
-	for(int ub = 5; ub < 8; ub++)
+	for(int ub = 0; ub < 7; ub++)
 	{
 		stringstream ss;
 		ss << "output/" << dataset << "_t=" << ub << "_" << OUTPUTFILE;
@@ -77,9 +78,14 @@ int main(int argc, char **argv)
 			candidates.clear();
 			graph q = queryDB[i];
 			gettimeofday(&start, NULL); 
+#ifdef PRUNE
 			retCode = database.QueryProcess(queryDB[i].graph_id, ub, width,
 					useFineGrainWhenPrune,
 					q, result, candidates);
+#else
+			retCode = database.directVerify(queryDB[i].graph_id, ub, width,
+					q, result);
+#endif
 			if (!retCode)
 			{
 				cout << "error when query " << q.graph_id << endl;
@@ -109,10 +115,11 @@ int main(int argc, char **argv)
 	
 		cout << "ub = " << ub << ", average response time = " << 
 			totalTime/queryDB.size() << " s" << endl;
+#ifdef PRUNE
 		cout << "average encode time: " << database.totalEncodeTime / queryDB.size() << "; ";
 		cout << "average search time: " << database.totalSearchTime / queryDB.size() << "; ";
 		cout << "average verify time: " << database.totalVerifyTime / queryDB.size() << "; ";
-
+#endif
 		cout << "results written in " << ss.str() << endl;
 		database.totalEncodeTime = 0;
 		database.totalSearchTime = 0;

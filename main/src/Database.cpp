@@ -554,7 +554,7 @@ Database::directVerify(const int qid, const int ub, const int width,
 		}
 		FLAG = true;
 	}
-
+	return true;
 
 }
 

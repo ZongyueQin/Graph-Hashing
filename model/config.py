@@ -4,7 +4,7 @@ flags = tf.app.flags
 FLAGS = flags.FLAGS
 
 #dataset related
-dataset = 'linux50'
+dataset = 'AIDS'
 
 if 'linux' in dataset:
     flags.DEFINE_string('dataset', dataset,'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
@@ -33,7 +33,7 @@ else:
     flags.DEFINE_string('node_feat_name','type','Name of node feature')
 
 # flags for sample by proximity
-flags.DEFINE_boolean('sample_by_proximity', True, 'if enable sample by proximity')
+flags.DEFINE_boolean('sample_by_proximity', False, 'if enable sample by proximity')
 flags.DEFINE_integer('sample_pool_size', 200, 'Sample Pool Size')
 flags.DEFINE_integer('positive_sample_num', 5, 'positive sample number')
 flags.DEFINE_integer('update_iter_num', 10, 'Number of iterations to update sample pool') # recommend ecd_batchsize/batchsize
@@ -54,17 +54,17 @@ flags.DEFINE_integer('ecd_batchsize', 100, 'encoding batch size')
 flags.DEFINE_string('label_type', 'ged', 'whether training label should be binary or ged')
 
 # loss related
-flags.DEFINE_float('exp_a', 0, 'a for exp weight')
+flags.DEFINE_float('exp_a', 0.05, 'a for exp weight')
 flags.DEFINE_float('weight_decay', 0.00, 'Weight for L2 loss on embedding matrix.')
 #flags.DEFINE_float('DSH_loss_m',24,'parameter m for DSH loss')
-flags.DEFINE_float('binary_regularizer_weight',0.2,'weight for binary regularizer')
+flags.DEFINE_float('binary_regularizer_weight',0.2,'weight for binary regularizer')#original 0.2
 #flags.DEFINE_float('MAX_BRW', 2, 'maximal binary regularizer weight')
 #flags.DEFINE_float('BRW_increase_rate', 5, 'the rate to incrase binary regularizer weight')
 flags.DEFINE_float('real_data_loss_weight', 1, 'weight of real data part (loss_1) in MSE_loss')
 flags.DEFINE_float('syn_data_loss_weight', 1, 'weight of synthesized data part (loss_2) in MSE_loss')
 #flags.DEFINE_float('l1_loss_w',0.0,'weight of l1 loss for codes')
 flags.DEFINE_float('code_mse_w', 1, 'weight for code mse loss')
-flags.DEFINE_float('emb_mse_w', 10, 'weight for emb mse loss')
+flags.DEFINE_float('emb_mse_w', 10, 'weight for emb mse loss')#orinial 10
 
 # model structure related
 #flags.DEFINE_string('model', 'gcn', 'Model string.')  # 'gcn', 'gcn_cheby', 'dense'

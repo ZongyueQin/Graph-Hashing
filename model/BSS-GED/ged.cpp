@@ -130,8 +130,10 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				if(ub == -1)  bound = max(g.v, q.v) + g.e + q.e;
-				else bound = ub;
+			//	if(ub == -1)  bound = max(g.v, q.v) + g.e + q.e;
+			//	else bound = ub;
+				bound = max(g.v,q.v)+g.e+q.e;
+				if (ub != -1 && ub < bound) bound = ub;
 				BSEditDistance ed(width);
 				changeLabel(g.V, q.V);
 	//		cout << g.graph_id << ' ' << q.graph_id << endl;

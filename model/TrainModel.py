@@ -30,12 +30,12 @@ from train import train_model, train_GH_CSM
 #from query import rangeQueryCSM
 
 """ environment configuration """
-os.environ['CUDA_VISIBLE_DEVICES']='3,2'
+os.environ['CUDA_VISIBLE_DEVICES']='5'
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
 
-model_name = "0122_"+FLAGS.dataset
+model_name = "0129_"+FLAGS.dataset
 model_path = "SavedModel/"+model_name+".ckpt"
 saved_files_dir = "SavedModel"
 

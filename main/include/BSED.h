@@ -345,7 +345,7 @@ public:
 		int commonEdge = common::initCommonLabel(le_1, le_2, max_e_1, max_e_2);
 		int lower_bound = max(g1.v, g2.v) - commonVertex + max(g1.e, g2.e) - commonEdge;
 		if (lower_bound > bound) return -1;
-
+/*
 		int degree_1[1024], degree_2[1024];
 		g1.degreeSet(degree_1, max_d_1); max_d_1++;
 		g2.degreeSet(degree_2, max_d_2); max_d_2++;
@@ -389,6 +389,8 @@ public:
 		tmp = max(tmp, edge2 - commonEdge + de);
 		lower_bound = max(g1.v, g2.v) - commonVertex + tmp;
 		if (lower_bound > bound) return -1;
+*/
+		if (false) return -1;
 		else
 		{
 			initFilter++;
