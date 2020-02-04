@@ -59,7 +59,7 @@ print("Model restored from", model_path)
 
 # encoding training data
 
-inverted_index, id2emb, id2code, bit_weights = encodeTrainingData(sess, model, 
+index, bit_weights = encodeTrainingData(sess, model, 
                                                      data_fetcher, 
                                                      placeholders,
                                                      True, True)
@@ -72,8 +72,8 @@ print('encoding data, cost %.5f s'%(time.time()-start_time))
 index_file = open('SavedModel/inverted_index_'+output_fname+'.pkl', 'wb')
 pickle.dump(inverted_index, index_file)
 index_file.close()
-writeInvertedIndex(os.path.join(saved_files_dir, 'inverted_index_'+output_fname+'.txt'),
-                   inverted_index, 
+writeIndex(os.path.join(saved_files_dir, 'Index_'+output_fname+'.txt'),
+                   index, 
                    FLAGS.embedding_dim)
 print('Bit Weights:')
 print(bit_weights)

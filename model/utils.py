@@ -187,7 +187,7 @@ def writeBitWeights(filename, bit_weights):
         f.write(str(w)+'\n')
     f.close()
 
-def writeInvertedIndex(filename, index, embLen = FLAGS.hash_code_len):
+def writeIndex(filename, index, embLen = FLAGS.hash_code_len):
     f = open(filename, 'w')
     f.write(str(len(index.keys()))+'\n')
     f.write(str(embLen)+'\n')
@@ -210,14 +210,14 @@ def encodeTrainingData(sess, model, data_fetcher, placeholders,
                        use_emb=True, use_code=True, ecd_bs=-1):
     print('start encoding training data...')
     train_graph_num = data_fetcher.get_train_graphs_num()
-    inverted_index = {}
+    index = {}
     #encode_batchsize = (1+FLAGS.k) * FLAGS.batchsize
     if ecd_bs == -1:
         encode_batchsize=FLAGS.ecd_batchsize
     else:
         encode_batchsize = ecd_bs
-    all_codes = []
-    all_embs = []
+    #all_codes = []
+    #all_embs = []
     thres = np.zeros(FLAGS.hash_code_len)
     
     for i in range(0, train_graph_num, encode_batchsize):
@@ -241,29 +241,45 @@ def encodeTrainingData(sess, model, data_fetcher, placeholders,
                                     feed_dict = feed_dict)
             codes = list(codes)
             codes = codes[0:end-i]
-            all_codes = all_codes + codes
+     #       all_codes = all_codes + codes
     
             embs = list(embs)
             embs = embs[0:end-i]
-            all_embs = all_embs + embs
+     #       all_embs = all_embs + embs
     
         elif use_code and use_emb == False:
             codes = sess.run(model.codes, feed_dict=feed_dict)
             codes = list(codes)
             codes = codes[0:end-i]
-            all_codes = all_codes + codes
-            all_embs = all_codes
+     #       all_codes = all_codes + codes
+     #       all_embs = all_codes
         elif use_code == False and use_emb:
             embs = sess.run(model.ecd_embeddings, feed_dict=feed_dict)
             embs = list(embs)
             embs = embs[0:end-i]
-            all_embs = all_embs + embs
-            all_codes = all_embs
+     #       all_embs = all_embs + embs
+     #       all_codes = all_embs
         else:
             raise RuntimeError('use_code and use_emb cannot both be False')
+        for j, pair in enumerate(zip(codes, embs)):
+            pos = i + j
+            if pos % 1000000 == 0:
+                print('Finish %d graphs'%pos)
+            code = pair[0]
+            emb = pair[1]
+            tuple_code = tuple(code)
+            gid = data_fetcher.get_train_graph_gid(pos)
+            if use_emb and use_code:
+                index.setdefault(tuple_code, [])
+                index[tuple_code].append((gid, emb))
+            if use_code and use_emb == False:
+                index.setdefault(tuple_code, [])
+                index[tuple_code].append((gid, None))            
+
 
     print('threshold is')
     print(thres)
+    """
     id2emb = {}
     id2code = {}
     for i, pair in enumerate(zip(all_codes, all_embs)):
@@ -281,11 +297,12 @@ def encodeTrainingData(sess, model, data_fetcher, placeholders,
             id2emb[gid] = emb
         if use_code:
             id2code[gid] = code
+    """
     bit_weights = sess.run(model.bit_weights)
     if bit_weights is None:
         bit_weights = np.ones((FLAGS.hash_code_len))       
     print('finish encoding training data')
-    return inverted_index, id2emb, id2code, bit_weights
+    return index, bit_weights
 
 def readGroundTruth(f):
     ged_cnt = {}
