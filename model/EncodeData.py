@@ -10,7 +10,7 @@ from graphHashFunctions import GraphHash_Emb_Code
 from config import FLAGS
 from DataFetcher import DataFetcher
 
-os.environ['CUDA_VISIBLE_DEVICES']='5'
+os.environ['CUDA_VISIBLE_DEVICES']='4'
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
@@ -21,7 +21,7 @@ if len(sys.argv) != 3:
     print('parameters are model_path, output_name')
     os._exit(0)
 model_path = str(sys.argv[1])
-output_name = str(sys.argv[2])
+output_fname = str(sys.argv[2])
 
 
 """ Load datafetcher and model"""
@@ -69,15 +69,15 @@ inverted_index, id2emb, id2code, bit_weights = encodeTrainingData(sess, model,
 #                                                  placeholders)
 print('encoding data, cost %.5f s'%(time.time()-start_time))
 
-index_file = open('SavedModel/inverted_index_'+model_name+'.pkl', 'wb')
+index_file = open('SavedModel/inverted_index_'+output_fname+'.pkl', 'wb')
 pickle.dump(inverted_index, index_file)
 index_file.close()
-writeInvertedIndex(os.path.join(saved_files_dir, 'inverted_index_'+model_name+'.txt'),
+writeInvertedIndex(os.path.join(saved_files_dir, 'inverted_index_'+output_fname+'.txt'),
                    inverted_index, 
                    FLAGS.embedding_dim)
 print('Bit Weights:')
 print(bit_weights)
-writeBitWeights(os.path.join(saved_files_dir, 'bit_weights_'+model_name+'.txt'),
+writeBitWeights(os.path.join(saved_files_dir, 'bit_weights_'+output_fname+'.txt'),
         bit_weights)
 
 
