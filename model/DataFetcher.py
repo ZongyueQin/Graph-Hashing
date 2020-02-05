@@ -48,8 +48,8 @@ class DataFetcher:
         self.train_data_dir = os.path.join(self.data_dir,'train')
         self.test_data_dir = os.path.join(self.data_dir, 'test')
         # read graphs
-        self.train_file = os.path.join(self.train_data_dir, 'graphs10M.bss')
-        self.test_file = os.path.join(self.test_data_dir, 'graphs10M.bss')
+        self.train_file = os.path.join(self.train_data_dir, 'graphs.bss')
+        self.test_file = os.path.join(self.test_data_dir, 'graphs.bss')
 
         train_graphs, max_label = self._readGraphs(self.train_file)
         #train_graphs = train_graphs[0:FLAGS.batchsize*(1+FLAGS.k)]
@@ -340,6 +340,8 @@ class DataFetcher:
         max_node_label = 0
         for line in f.readlines():
             if status == 'id':
+                if len(graphs) == self.max_graph_num:
+                    break
                 graph = {}
                 graph['gid'] = int(line)
                 graph['nodes'] = []
@@ -362,6 +364,7 @@ class DataFetcher:
                     if edge_left > 0:
                         status = 'edge'
                     else:
+                        graphs.append(graph)
                         status = 'id'
             elif status == 'edge':
                 line = line.split()

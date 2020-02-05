@@ -18,6 +18,7 @@ config.gpu_options.allow_growth = True
 
 MinGED = 0
 MaxGED = 11
+MaxGraphNum = 999900
 
 if len(sys.argv) != 3:
     print('parameters are model_path, output_name')
@@ -28,7 +29,7 @@ output_fname = str(sys.argv[2])
 
 """ Load datafetcher and model"""
 print('restoring model...')
-data_fetcher = DataFetcher(dataset=FLAGS.dataset, exact_ged=True)
+data_fetcher = DataFetcher(dataset=FLAGS.dataset, exact_ged=True, max_graph_num=MaxGraphNum)
 node_feature_dim = data_fetcher.get_node_feature_dim()
 # Define placeholders
 placeholders = {
