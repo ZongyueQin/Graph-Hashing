@@ -1,3 +1,5 @@
+import time
+import pickle
 import tensorflow as tf
 import numpy as np
 import os
@@ -58,7 +60,7 @@ saver.restore(sess, model_path)
 print("Model restored from", model_path)
 
 # encoding training data
-
+start_time = time.time()
 index, bit_weights = encodeTrainingData(sess, model, 
                                                      data_fetcher, 
                                                      placeholders,
@@ -69,9 +71,10 @@ index, bit_weights = encodeTrainingData(sess, model,
 #                                                  placeholders)
 print('encoding data, cost %.5f s'%(time.time()-start_time))
 
-index_file = open('SavedModel/inverted_index_'+output_fname+'.pkl', 'wb')
-pickle.dump(inverted_index, index_file)
+index_file = open('SavedModel/Index_'+output_fname+'.pkl', 'wb')
+pickle.dump(index, index_file)
 index_file.close()
+saved_files_dir = "SavedModel"
 writeIndex(os.path.join(saved_files_dir, 'Index_'+output_fname+'.txt'),
                    index, 
                    FLAGS.embedding_dim)

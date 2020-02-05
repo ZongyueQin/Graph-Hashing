@@ -48,8 +48,8 @@ class DataFetcher:
         self.train_data_dir = os.path.join(self.data_dir,'train')
         self.test_data_dir = os.path.join(self.data_dir, 'test')
         # read graphs
-        self.train_file = os.path.join(self.train_data_dir, 'graphs.bss')
-        self.test_file = os.path.join(self.test_data_dir, 'graphs.bss')
+        self.train_file = os.path.join(self.train_data_dir, 'graphs10M.bss')
+        self.test_file = os.path.join(self.test_data_dir, 'graphs10M.bss')
 
         train_graphs, max_label = self._readGraphs(self.train_file)
         #train_graphs = train_graphs[0:FLAGS.batchsize*(1+FLAGS.k)]
