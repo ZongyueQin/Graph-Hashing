@@ -12,13 +12,13 @@ from graphHashFunctions import GraphHash_Emb_Code
 from config import FLAGS
 from DataFetcher import DataFetcher
 
-os.environ['CUDA_VISIBLE_DEVICES']='4'
+os.environ['CUDA_VISIBLE_DEVICES']='2'
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
 MinGED = 0
 MaxGED = 11
-MaxGraphNum = 999900
+MaxGraphNum = 4999900
 
 if len(sys.argv) != 3:
     print('parameters are model_path, output_name')

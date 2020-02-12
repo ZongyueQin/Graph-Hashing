@@ -4,12 +4,12 @@ import os
 import pickle
 import xml
 has_dict = True
-data_dir = "FULL_ALCHEMY/test"
+data_dir = "linux100/train"
 
 graphs = []
 geds = {}
 
-constant =False
+constant =True
 #def node_match(n1, n2):
 #  return n1['type'] == n2['type']
 

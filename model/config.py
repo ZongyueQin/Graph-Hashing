@@ -4,7 +4,7 @@ flags = tf.app.flags
 FLAGS = flags.FLAGS
 
 #dataset related
-dataset = 'BA'
+dataset = 'linux50'
 
 if 'linux' in dataset:
     flags.DEFINE_string('dataset', dataset,'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
@@ -47,14 +47,14 @@ flags.DEFINE_boolean('clip', True, 'clip GED beyond GED_threshold')
 
 # data sample related
 flags.DEFINE_integer('max_op', 1, 'maximum operations to generate synthetic graphs')
-flags.DEFINE_integer('k', 0, 'when training, we would generate k similar graphs for each one of sampled graphs')
+flags.DEFINE_integer('k', 4, 'when training, we would generate k similar graphs for each one of sampled graphs')
 flags.DEFINE_integer('GED_threshold', 11, 'threshold within which 2 graphs are similar')
 flags.DEFINE_integer('batchsize',10,'batch size for training')
 flags.DEFINE_integer('ecd_batchsize', 100, 'encoding batch size')
 flags.DEFINE_string('label_type', 'ged', 'whether training label should be binary or ged')
 
 # loss related
-flags.DEFINE_float('exp_a', 0.05, 'a for exp weight')
+flags.DEFINE_float('exp_a', 0.05, 'a for exp weight')# ori 0.05
 flags.DEFINE_float('weight_decay', 0.00, 'Weight for L2 loss on embedding matrix.')
 #flags.DEFINE_float('DSH_loss_m',24,'parameter m for DSH loss')
 flags.DEFINE_float('binary_regularizer_weight',0.2,'weight for binary regularizer')#original 0.2
@@ -63,7 +63,7 @@ flags.DEFINE_float('binary_regularizer_weight',0.2,'weight for binary regularize
 flags.DEFINE_float('real_data_loss_weight', 1, 'weight of real data part (loss_1) in MSE_loss')
 flags.DEFINE_float('syn_data_loss_weight', 1, 'weight of synthesized data part (loss_2) in MSE_loss')
 #flags.DEFINE_float('l1_loss_w',0.0,'weight of l1 loss for codes')
-flags.DEFINE_float('code_mse_w', 1, 'weight for code mse loss')
+flags.DEFINE_float('code_mse_w', 1, 'weight for code mse loss')# ori 1
 flags.DEFINE_float('emb_mse_w', 10, 'weight for emb mse loss')#orinial 10
 
 # model structure related

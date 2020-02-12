@@ -11,7 +11,7 @@ using namespace std;
 
 #define CODELEN 32
 #define OUTPUTFILE "output.txt"
-#define dataset "NODEG_ER"
+#define dataset "All_linux50"
 #define PRUNE
 
 int main(int argc, char **argv)
@@ -71,7 +71,7 @@ int main(int argc, char **argv)
 		struct timeval start,end; 
 		float timeuse, totalTime = 0; 
 
-		bool useFineGrainWhenPrune = true, retCode;
+		bool useFineGrainWhenPrune = false, retCode;
 		for(int i = 0; i < queryDB.size();i++)
 		{
 			result.clear();
