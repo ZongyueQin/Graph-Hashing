@@ -30,12 +30,12 @@ from train import train_model, train_GH_CSM
 #from query import rangeQueryCSM
 
 """ environment configuration """
-os.environ['CUDA_VISIBLE_DEVICES']='2'
+#os.environ['CUDA_VISIBLE_DEVICES']='2'
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
 
-model_name = "0203_NoSyn_"+FLAGS.dataset
+model_name = "0528_CODE_LEN_"+str(FLAGS.hash_code_len)+"_"+FLAGS.dataset
 model_path = "SavedModel/"+model_name+".ckpt"
 saved_files_dir = "SavedModel"
 
@@ -117,7 +117,7 @@ train_model(sess, model, saver, placeholders, data_fetcher, save_path=model_path
 #saver.restore(sess, model_path)
  
 start_time = time.time()
-inverted_index, id2emb, id2code, bit_weights = encodeTrainingData(sess, model, 
+inverted_index, bit_weights = encodeTrainingData(sess, model, 
                                                      data_fetcher, 
                                                      placeholders,
                                                      True, True)
@@ -130,9 +130,10 @@ print('encoding data, cost %.5f s'%(time.time()-start_time))
 index_file = open('SavedModel/inverted_index_'+model_name+'.pkl', 'wb')
 pickle.dump(inverted_index, index_file)
 index_file.close()
-writeInvertedIndex(os.path.join(saved_files_dir, 'inverted_index_'+model_name+'.txt'),
-                   inverted_index, 
-                   FLAGS.embedding_dim)
+#writeInvertedIndex(os.path.join(saved_files_dir, 'inverted_index_'+model_name+'.txt'),
+writeIndex(os.path.join(saved_files_dir, 'inverted_index_'+model_name+'.txt'), 
+            inverted_index, 
+            FLAGS.embedding_dim)
 print('Bit Weights:')
 print(bit_weights)
 writeBitWeights(os.path.join(saved_files_dir, 'bit_weights_'+model_name+'.txt'),

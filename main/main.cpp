@@ -11,8 +11,9 @@ using namespace std;
 
 #define CODELEN 32
 #define OUTPUTFILE "output.txt"
-#define dataset "NODEG_ER"
+#define dataset "0528_AIDS_32_true"
 #define PRUNE
+bool secondaryPruning = true;
 
 int main(int argc, char **argv)
 {
@@ -71,7 +72,7 @@ int main(int argc, char **argv)
 		struct timeval start,end; 
 		float timeuse, totalTime = 0; 
 
-		bool useFineGrainWhenPrune = true, retCode;
+		bool retCode;
 		for(int i = 0; i < queryDB.size();i++)
 		{
 			result.clear();
@@ -80,7 +81,7 @@ int main(int argc, char **argv)
 			gettimeofday(&start, NULL); 
 #ifdef PRUNE
 			retCode = database.QueryProcess(queryDB[i].graph_id, ub, width,
-					useFineGrainWhenPrune,
+					secondaryPruning,
 					q, result, candidates);
 #else
 			retCode = database.directVerify(queryDB[i].graph_id, ub, width,

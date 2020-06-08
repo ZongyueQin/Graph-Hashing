@@ -4,7 +4,7 @@ flags = tf.app.flags
 FLAGS = flags.FLAGS
 
 #dataset related
-dataset = 'BA'
+dataset = 'AIDS'
 
 if 'linux' in dataset:
     flags.DEFINE_string('dataset', dataset,'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
@@ -47,7 +47,7 @@ flags.DEFINE_boolean('clip', True, 'clip GED beyond GED_threshold')
 
 # data sample related
 flags.DEFINE_integer('max_op', 1, 'maximum operations to generate synthetic graphs')
-flags.DEFINE_integer('k', 0, 'when training, we would generate k similar graphs for each one of sampled graphs')
+flags.DEFINE_integer('k', 1, 'when training, we would generate k similar graphs for each one of sampled graphs')
 flags.DEFINE_integer('GED_threshold', 11, 'threshold within which 2 graphs are similar')
 flags.DEFINE_integer('batchsize',10,'batch size for training')
 flags.DEFINE_integer('ecd_batchsize', 100, 'encoding batch size')
@@ -81,7 +81,7 @@ flags.DEFINE_integer('embedding_dim', 256, 'dimension of embeddings')
 
 flags.DEFINE_integer('hidden6', 128, 'Number of units in hidden layer 6.')
 
-flags.DEFINE_integer('hash_code_len',32,'length of hash code')
+flags.DEFINE_integer('hash_code_len', 32,'length of hash code')
 
 # training related
 flags.DEFINE_float('dropout', 0., 'Dropout rate (1 - keep probability).')
@@ -95,9 +95,9 @@ flags.DEFINE_float('early_stopping_thres', 0.1, '')
 flags.DEFINE_integer('last_n', 5, 'last n loss is used to decide early stopping or not')
 
 # query related
-flags.DEFINE_boolean('fine_grained', True, 'whether use fine grained in range query')
-flags.DEFINE_integer('hamming_dist_thres', 2, 'threshold of similar binary codes')
-flags.DEFINE_integer('top_k', 10, 'how many nearest neighbors to retrieve')
+#flags.DEFINE_boolean('fine_grained', True, 'whether use fine grained in range query')
+#flags.DEFINE_integer('hamming_dist_thres', 2, 'threshold of similar binary codes')
+#flags.DEFINE_integer('top_k', 10, 'how many nearest neighbors to retrieve')
 
         
 #flags.DEFINE_integer('max_degree', 3, 'Maximum Chebyshev polynomial degree.')
