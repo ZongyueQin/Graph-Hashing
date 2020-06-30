@@ -103,7 +103,7 @@ def sorted_nicely(l):
 
     return sorted(l, key=alphanum_key)
 
-def get_similar_graphs_gid(inverted_index, code, thres=FLAGS.hamming_dist_thres):
+def get_similar_graphs_gid(inverted_index, code, thres):
     """ use bfs to find all similar codes """
     sets = []
     frontier = [(code, 0, -1)]

@@ -18,6 +18,7 @@ private:
 	vector <graph> graphDB;
 	const string pythonPath = "../model";
 	PyObject *getCodeAndEmbByQid;
+	PyObject *getCodeAndEmbByString;
 	CodePos *code2Pos;
 	GInfo *invertedIndexValue;
 	map <uint64_t, uint64_t> gid2Pos;
@@ -45,6 +46,10 @@ public:
 	bool QueryProcess(const int qid, const int ub, const int width,
 		bool fineGrained, const graph &q, vector<int> &ret, vector<int> &candGid);
 
+	bool QueryProcess(const string &str, const int ub, const int width,
+		bool fineGrained, const graph &q, vector<int> &ret, vector<int> &candGid);
+
+
 	bool directVerify(const int qid, const int ub, const int width,
 			const graph &q, vector<int> &ret);
 	bool topKQueryProcess(const int gid, const int K, vector<uint64_t> &ret, int thres = 11); 
@@ -54,6 +59,7 @@ private:
 		 vector<int> &ret);
 
 	bool getCodeAndEmbByQidWithPython(const int qid, uint64_t &code, GInfo &qInfo);
+	bool getCodeAndEmbByStringWithPython(const string &str, uint64_t &code, GInfo &qInfo);
 
 
 };

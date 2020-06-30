@@ -9,9 +9,10 @@
 
 using namespace std;
 
+
 #define CODELEN 32
 #define OUTPUTFILE "output.txt"
-#define dataset "0528_AIDS_32_true"
+#define dataset "0625_NoHash_FULL_ALCHEMY"
 #define PRUNE
 bool secondaryPruning = true;
 

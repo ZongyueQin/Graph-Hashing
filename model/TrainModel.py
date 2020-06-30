@@ -35,7 +35,7 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 
 
-model_name = "0528_CODE_LEN_"+str(FLAGS.hash_code_len)+"_"+FLAGS.dataset
+model_name = "0618_NoAug"+FLAGS.dataset
 model_path = "SavedModel/"+model_name+".ckpt"
 saved_files_dir = "SavedModel"
 

@@ -1,5 +1,6 @@
 #include "Database.h"
 
+//#define GET_ALL_CODE
 //#define BITWEIGHT
 using namespace std;
 
@@ -96,6 +97,9 @@ uint64_t getHammingDistance(uint64_t a, uint64_t b, int len)
 double getHammingDistance(uint64_t a, uint64_t b, int len, double *weights)
 #endif
 {
+#ifdef GET_ALL_CODE
+	return 0;
+#endif
 	uint64_t diff= a ^ b;
 #ifdef BITWEIGHT
 	double ret = 0;
@@ -123,12 +127,17 @@ void getAllValidCode(uint64_t code, int thres,
 				CodePos *index, vector<uint64_t> &res,
 				double *bit_weights)
 {
+#ifndef GET_ALL_CODE
 	uint64_t searchSpace = computeSearchSpace(codeLen, thres);
+#else
+	uint64_t searchSpace = totalCodeCnt + 1;
+#endif
 	if (searchSpace > totalCodeCnt)
 	{
 		for(int i = 0; i < totalCodeCnt; i++)
 		{
 			uint64_t newCode = index[i].code;
+
 #ifndef BITWEIGHT
 			uint64_t hammingDistance = getHammingDistance(newCode, code, codeLen);
 			if (hammingDistance <= (uint64_t)thres)
@@ -381,7 +390,19 @@ Database::Database(const string &modelPath, const string &db,
 			<< endl;
 		exit(0);
 	}
-	cout << "[INFO] Get function (getCodeAndEmbByGid) succeed" << endl;
+	cout << "[INFO] Get function (getCodeAndEmbByQid) succeed" << endl;
+
+	getCodeAndEmbByString = PyObject_GetAttrString(pModule, 
+							"getCodeAndEmbByString");
+	if (!getCodeAndEmbByString || !PyCallable_Check(getCodeAndEmbByString))
+	{
+		cout << "[ERROR] Can't find function (getCodeAndEmbByString)" 
+			<< endl;
+		exit(0);
+	}
+	cout << "[INFO] Get function (getCodeAndEmbByString) succeed" << endl;
+
+
 	
 
 	/* load databases */
@@ -408,12 +429,14 @@ Database::Database(const string &modelPath, const string &db,
 	
 	InvertedIndexEntry *invertedIndex = new InvertedIndexEntry[totalCodeCnt];
 	
+	ofstream tmp(invIndex+"_count");
 	size_t tupleCnt = 0;
 	for(int i = 0; i < totalCodeCnt; i++)
 	{
 		fin >> invertedIndex[i].code;
 		int len;
 		fin >> len;
+		tmp << len << endl;
 		invertedIndex[i].infos.resize(len);
 		tupleCnt += len;
 		for(int j = 0; j < len; j++)
@@ -447,6 +470,36 @@ Database::Database(const string &modelPath, const string &db,
 	cout << "Loading database done" << endl;
 }
 
+bool 
+Database::getCodeAndEmbByStringWithPython(const string &str, uint64_t &code, GInfo &qInfo)
+{
+	PyObject *ret = PyObject_CallFunction(getCodeAndEmbByString, "s", str.c_str());
+	if (!ret || !PyTuple_Check(ret))
+	{
+		cout << "Failed to get code and embedding " << endl;
+		PyRun_SimpleString("print('')");
+		return false;
+	} 	
+	
+
+	PyObject *py_code = PyTuple_GetItem(ret, 0);
+	assert(PyLong_Check(py_code));
+	code = PyLong_AsLong(py_code);
+//	cout << code << endl;
+
+	PyObject *py_emb = PyTuple_GetItem(ret, 1);
+	assert(embLen = PyTuple_Size(py_emb));
+	
+	qInfo.gid = 0;
+	//qInfo.code =  code;
+	for(int i = 0; i < embLen; i++)
+	{
+		qInfo.emb[i] = PyFloat_AsDouble(PyTuple_GetItem(py_emb, i));
+	}
+
+	return true;
+
+}
 /* Call python to encode a query graph given qid, the correspnding query file
  * should be read into DataFetcher in advance.
  */
@@ -497,7 +550,6 @@ Database::QueryProcessGetCandidate(const int qid, const int ub, const int width,
 	if (!retCode) return false;
 	/* search all code within threshld */
 	vector <uint64_t> validCode;	
-
 	getAllValidCode(qCode, GED2Hamming[ub], totalCodeCnt, codeLen, code2Pos,
 			validCode, this->bit_weights);
 //	getAllValidCode(qCode, ub+1, totalCodeCnt, codeLen, code2Pos,
@@ -586,6 +638,120 @@ Database::QueryProcess(const int qid, const int ub, const int width,
 	gettimeofday(&start, NULL);
 
  	bool retCode = getCodeAndEmbByQidWithPython(qid, qCode, qInfo);
+
+	gettimeofday(&end, NULL);
+	float timeuse = 1000000 * (end.tv_sec - start.tv_sec)
+				 + end.tv_usec - start.tv_usec; 
+	timeuse = timeuse * 1.0 / 1000000; 
+	totalEncodeTime += timeuse;			 
+
+
+	if (!retCode) return false;
+
+	/* search all code within threshld */
+	
+	vector <uint64_t> validCode;	
+	gettimeofday(&start, NULL);
+	getAllValidCode(qCode, GED2Hamming[ub], totalCodeCnt, codeLen, code2Pos,
+			validCode, this->bit_weights);
+	//getAllValidCode(qCode, ub+1, totalCodeCnt, codeLen, code2Pos,
+	//		validCode);
+
+
+	/* get gids of graphs of those codes */
+	//vector <graph> candidateSet;
+	vector<int> candidateSet;
+	int totalGraphCnt = graphDB.size();
+	for(int i = 0; i < validCode.size(); i++)
+	{
+		int start = code2Pos[validCode[i]].pos;
+		int end;
+		if (validCode[i] == totalCodeCnt-1)
+			end = totalGraphCnt;
+		else
+		 	end = code2Pos[validCode[i]+1].pos;
+		for(int j = start; j < end; j++)
+		{
+			double dis = dist(qInfo, invertedIndexValue[j], 
+						embLen);
+//			if (fineGrained > 0 && dis > ((double)ub) + 0.5)
+			if (fineGrained > 0 && dis > ((double)GED2Hamming[ub]-0.5))
+			{
+				continue;
+			}
+			uint64_t pos = gid2Pos[invertedIndexValue[j].gid];
+//			assert(graphDB[pos].graph_id == invertedIndexValue[j].gid);
+			//candidateSet.push_back(graphDB[pos]);
+			candidateSet.push_back(pos);
+			candGid.push_back(invertedIndexValue[j].gid);
+		}
+	}
+	gettimeofday(&end, NULL);
+	timeuse = 1000000 * (end.tv_sec - start.tv_sec)
+				 + end.tv_usec - start.tv_usec; 
+	timeuse = timeuse * 1.0 / 1000000; 
+	totalSearchTime += timeuse;			 
+
+
+	/* verification stage */
+	gettimeofday(&start, NULL);
+//	Verify(q, candidateSet, ub, width, ret);
+	int i = 0, bound;
+	for(; i < candidateSet.size();i++)
+	{
+		graph g = graphDB[candidateSet[i]];
+		graph query = q; 
+//		changeLabel(q.V, g.V);
+		if(ub == -1)  bound = max(g.v, q.v) + g.e + q.e;
+		else bound = ub;
+		BSEditDistance ed(width);
+		int ged = ed.getEditDistance(query, g, bound);
+		//cout << ged << endl;
+		if (ged >= 0)
+		{
+			ret.push_back(g.graph_id);
+		}
+		FLAG = true;
+	}
+
+	gettimeofday(&end, NULL);
+	timeuse = 1000000 * (end.tv_sec - start.tv_sec)
+				 + end.tv_usec - start.tv_usec; 
+	timeuse = timeuse * 1.0 / 1000000; 
+	totalVerifyTime += timeuse;			 
+
+	return true;
+}
+
+
+/**
+ * Process Query identifeid by qid, push final results into vector @ret, push 
+   filtered candidates into vector @candGid
+ * @param str: string that descriptes the query graph
+ * @param ub: the upbound of range query, i.e. we return graphs whose GED to 
+              the query graph is smaller or equal to ub.
+ * @param width: the beam width used by BSS-GED, recommend 15 or 50, depending
+                 on your memory capacity.
+ * @param fineGrained: if use continuous embedding to fine grain the candidates
+                       recommend set to true
+ * @pram q: the query graph, used by BSS-GED to compute exact GED.
+ * @param ret: into which the returned graph ids are inserted 
+ * @param candGid: into which the candidates' ids are inserted
+ * @return: true if succeed, false otherwise.
+ */
+bool
+Database::QueryProcess(const string &str, const int ub, const int width,
+			bool fineGrained,
+			const graph &q, vector<int> &ret, vector<int> &candGid)
+{
+	/* get embedding and code */
+	GInfo qInfo;
+	uint64_t qCode;
+
+	struct timeval start, end;
+	gettimeofday(&start, NULL);
+
+ 	bool retCode = getCodeAndEmbByStringWithPython(str, qCode, qInfo);
 
 	gettimeofday(&end, NULL);
 	float timeuse = 1000000 * (end.tv_sec - start.tv_sec)

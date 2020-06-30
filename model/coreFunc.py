@@ -8,6 +8,7 @@ from utils import *
 from graphHashFunctions import GraphHash_Emb_Code
 from config import FLAGS
 from DataFetcher import DataFetcher
+from MyGraph import *
 
 os.environ['CUDA_VISIBLE_DEVICES']='5'
 config = tf.ConfigProto()
@@ -78,7 +79,56 @@ def getCodeAndEmbByQid(qid):
 #    emb = [3 for i in range(256)]
 #    emb = tuple(emb)
     return (code, emb)
+
+def getCodeAndEmbByString(string):
+    #Parse String
+    sequence = string.split(";")
+    graph = {}
+    graph['gid']=int(sequence[0])
+    nodeCnt = int(sequence[1])
+    edgeCnt = int(sequence[2])
+    graph['nodes']=[]
+    graph['edges']=[]
+    graph['adj_mat'] = np.zeros((nodeCnt, nodeCnt))
+    for i in range(nodeCnt):
+        graph['nodes'].append(int(sequence[i+3]))
+
+    for i in range(edgeCnt):
+        element = sequence[3+nodeCnt+i].split()
+        f_node = int(element[0])
+        t_node = int(element[1])
+        graph['edges'].append((f_node, t_node))
+        graph['adj_mat'][f_node, t_node] = 1
+        graph['adj_mat'][t_node, f_node] = 1
+
+    query_graph = MyGraph(graph, data_fetcher.max_label) 
+     
+#    print(query_graph)
+    features = query_graph.sparse_node_inputs
+    features = data_fetcher._sparse_to_tuple(features)
+
+    laplacian = query_graph.laplacian
+    laplacian = data_fetcher._sparse_to_tuple(laplacian)
     
+    size = [len(query_graph.ori_graph['nodes'])]
+
+    code, emb = getCodeAndEmb(features, laplacian, size)
+    code = tupleCode2IntegerCode(code[0])
+#    print(code)
+#    print('done')
+#    print(tuple(emb[0]))
+    emb = tuple(emb[0])
+#    print(len(emb))
+
+#    return code, emb
+#    print(code)    
+#    print(type(code))
+#    print(emb)
+#    emb = [3 for i in range(256)]
+#    emb = tuple(emb)
+    return (code, emb)
+
+
 
 def getCodeAndEmb(features, laplacian, size):
     feed_dict = dict()
