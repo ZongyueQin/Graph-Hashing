@@ -82,9 +82,9 @@ def getCodeAndEmbByQid(qid):
 
 def getCodeAndEmbByString(string):
     #Parse String
-    sequence = string.split(";")
+    sequence = string.split("\n")
     graph = {}
-    graph['gid']=int(sequence[0])
+    graph['gid'] = None
     nodeCnt = int(sequence[1])
     edgeCnt = int(sequence[2])
     graph['nodes']=[]

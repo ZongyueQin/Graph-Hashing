@@ -53,6 +53,47 @@ public:
 	bool directVerify(const int qid, const int ub, const int width,
 			const graph &q, vector<int> &ret);
 	bool topKQueryProcess(const int gid, const int K, vector<uint64_t> &ret, int thres = 11); 
+	graph getGraphByGid(const uint64_t id, bool &ret)
+	{
+		map<uint64_t, uint64_t>::iterator iter;
+		iter = gid2Pos.find(id);
+		if (iter != gid2Pos.end())
+		{
+			ret = true;
+			return graphDB[iter->second];
+		}
+		else
+		{
+			ret = false;
+			return graphDB[0];
+		}
+	}
+	bool getGraphStringByGid(string &str, const int64_t id)
+	{
+		map<uint64_t, uint64_t>::iterator iter;
+		iter = gid2Pos.find(id);
+		if (iter == gid2Pos.end())
+		{
+			return false;
+		}
+		else
+		{
+			str = "";
+			ostringstream os(str);
+			const graph &g = graphDB[iter->second];
+			os << g.graph_id << endl;
+			os << g.v << ' ' << g.e << endl;
+			for(int i = 0; i < g.v; i++)
+				os << g.V[i] << ' ';
+			for(int i = 0; i < g.v; i++)
+			{
+				for(int j = i; j < g.v; j++)
+					if(g.E[i][j] != 255)
+						os << i << ' ' << j << ' ' << g.E[i][j] <<endl;
+			}
+			return true;
+		}
+	}
 private:
 	bool Verify(const graph &query, const vector<graph> &candidates, 
 		 const int ub, const int width,
