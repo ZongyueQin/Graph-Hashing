@@ -8,7 +8,7 @@ Download the data from https://drive.google.com/open?id=1rF4QA-HDgNfFOme7M2Jw8Jj
 
 First enter *model/BSS-GED* and run **./setup.sh** 
 Then enter *main*, run **make**
-(It is very likely that you will need to change the value of the *cflags* and *ldflags* in main/mainfile. Their values should be the same as the outputs of command **python3-config --cflags** and **python3-config --ldflags**.
+(It is very likely that you will need to change the value of the *cflags* and *ldflags* in main/makefile. Their values should be the same as the outputs of command **python3-config --cflags** and **python3-config --ldflags**.
 
 ## How to train a model?
 
