@@ -17,7 +17,7 @@ First make sure configure config.py correctly. Then run **python TrainModel.py**
 ## How to run the benchmark?
 
 Enter *main*.
-Then run **bin/main** with correct parameters. The commands to run **AIDS**, **linux15**, **ALCHEMY** in our experiment is shown below.
+Then run **bin/main** with correct commands. The commands to run **AIDS**, **linux15**, **ALCHEMY** in our experiment is shown below. Make sure the parameters in main.cpp are consistent with the parameters in config.py.
 
 Dataset | command
 --------|---------
