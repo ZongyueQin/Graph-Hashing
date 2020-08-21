@@ -2,7 +2,7 @@
 
 ## How to get data?
 
-Download the data from https://drive.google.com/open?id=1rF4QA-HDgNfFOme7M2Jw8JjYXNb6rCye and uncompress it under data directory. We encourage you to split the datasets into training and test data yourself and store them like the demo dataset.
+Download the data from https://drive.google.com/file/d/1os3Kmk6iofy_0Yf0nskglEVwOpKNhPxx/view?usp=sharing and uncompress it under data directory. We encourage you to split the datasets into training and test data yourself and store them like the demo dataset.
 
 ## How to compile?
 
