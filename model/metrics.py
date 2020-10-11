@@ -123,7 +123,7 @@ def MSE_Loss(codes, label_1, label_2, a, bit_weights=None):
 
     # pred{i,j} = ||d_i - d_j||^2
     pred_1 = (M2 + tf.transpose(M2) - 2*M1)
-    pred_1 = tf.where(label_1>FLAGS.GED_threshold,
+    pred_1 = tf.where(label_1>=FLAGS.GED_threshold,
                          tf.clip_by_value(pred_1, 0, FLAGS.GED_threshold),
                          pred_1)
     loss_mat_1 = tf.matrix_band_part(tf.exp(a*(pred_1-label_1))*(pred_1 - label_1)**2, 0, -1)
@@ -143,7 +143,7 @@ def MSE_Loss(codes, label_1, label_2, a, bit_weights=None):
             W = tf.nn.relu(tf.stack([W_1 for i in range(bs)], axis=0))
             pred_2 = tf.reduce_sum(W*(A2-A3)**2, axis=2)
 
-        pred_2 = tf.where(label_2 > FLAGS.GED_threshold,
+        pred_2 = tf.where(label_2 >= FLAGS.GED_threshold,
                 tf.clip_by_value(pred_2, 0, FLAGS.GED_threshold),
                 pred_2)
 
