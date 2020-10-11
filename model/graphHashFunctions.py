@@ -525,13 +525,15 @@ class GraphHash_Emb_Code(Model):
         # MSE Loss For Continuous Embedding
         emb_mse_loss, _, _ = MSE_Loss(self.embeddings[0], 
                               self.labels, 
-                              self.gen_labels)
+                              self.gen_labels,
+                              a = 0)
 
         
         code_mse_loss, pred, lab = MSE_Loss(self.outputs[0], 
                                             self.labels, 
                                             self.gen_labels,
-                                            self.bit_weights)
+                                            bit_weights = self.bit_weights,
+                                            a = FLAGS.exp_a)
 
         self.loss = self.loss + code_mse_loss * FLAGS.code_mse_w
         self.loss = self.loss + emb_mse_loss * FLAGS.emb_mse_w
