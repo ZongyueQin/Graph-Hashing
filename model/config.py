@@ -4,7 +4,7 @@ flags = tf.app.flags
 FLAGS = flags.FLAGS
 
 #dataset related
-dataset = 'linux50'
+dataset = 'demo'
 
 if 'linux' in dataset:
     flags.DEFINE_string('dataset', dataset,'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
@@ -16,6 +16,10 @@ elif dataset == 'ALCHEMY':
     flags.DEFINE_string('node_feat_name','a_type','Name of node feature')
 elif dataset == 'AIDS': 
     flags.DEFINE_string('dataset', 'AIDS', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
+    flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
+    flags.DEFINE_string('node_feat_name','type','Name of node feature')
+elif dataset =='demo':
+    flags.DEFINE_string('dataset', 'demo', 'Dataset string.')  # 'cora', 'citeseer', 'pubmed'
     flags.DEFINE_string('node_feat_encoder','onehot','How to encode node feature')
     flags.DEFINE_string('node_feat_name','type','Name of node feature')
 elif dataset == 'FULL_ALCHEMY':
@@ -47,7 +51,7 @@ flags.DEFINE_boolean('clip', True, 'clip GED beyond GED_threshold')
 
 # data sample related
 flags.DEFINE_integer('max_op', 1, 'maximum operations to generate synthetic graphs')
-flags.DEFINE_integer('k', 4, 'when training, we would generate k similar graphs for each one of sampled graphs')
+flags.DEFINE_integer('k', 1, 'when training, we would generate k similar graphs for each one of sampled graphs')
 flags.DEFINE_integer('GED_threshold', 11, 'threshold within which 2 graphs are similar')
 flags.DEFINE_integer('batchsize',10,'batch size for training')
 flags.DEFINE_integer('ecd_batchsize', 100, 'encoding batch size')
