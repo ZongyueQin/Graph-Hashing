@@ -17,13 +17,17 @@ First make sure configure config.py correctly. Then run **python TrainModel.py**
 ## How to run the benchmark?
 
 Enter *main*.
-Then run **bin/main** with correct commands. The commands to run **AIDS**, **linux15**, **ALCHEMY** in our experiment is shown below. Make sure the parameters in main.cpp are consistent with the parameters in config.py.
+Then run **bin/main** with correct commands. 
+
+The command format is: **bin/main train_graph_file train_graph_number test_graph_file test_graph_number model_path, index_path (GED2Hamming mapping file)**
+
+The commands to run **AIDS**, **linux15**, **ALCHEMY** in our experiment is shown below. Make sure the parameters in main.cpp are consistent with the parameters in config.py.
 
 Dataset | command
 --------|---------
-AIDS | bin/main ../data/AIDS/train/graphs.bss 42587 ../data/AIDS/test/graphs.bss 100 15 model_path inverted_index_path (GED2Hamming mapping file)
-linux15 | bin/main ../data/linux15/train/graphs.bss 24087 ../data/linux15/test/graphs.bss 100 15 model_path inverted_index_path (GED2Hamming mapping file)
-ALCHEMY | bin/main ../data/ALCHEMY/train/graphs.bss 99676 ../data/ALCHEMY/test/graphs.bss 100 15 model_path inverted_index_path (GED2Hamming mapping file)
+AIDS | bin/main ../data/AIDS/train/graphs.bss 42587 ../data/AIDS/test/graphs.bss 100 15 model_path inverted_index_path 
+linux15 | bin/main ../data/linux15/train/graphs.bss 24087 ../data/linux15/test/graphs.bss 100 15 model_path inverted_index_path 
+ALCHEMY | bin/main ../data/ALCHEMY/train/graphs.bss 99676 ../data/ALCHEMY/test/graphs.bss 100 15 model_path inverted_index_path 
 
 **You need to make sure the dataset specified in model/config.py is consistent with the dataset in the commands above.**
 
@@ -35,15 +39,6 @@ ALCHEMY | bin/main ../data/ALCHEMY/train/graphs.bss 99676 ../data/ALCHEMY/test/g
 * scikit-learn
 * tensorflow
 * networkx==1.11 (NOT 2.1)
-* beautifulsoup4
-* lxml
 * matplotlib
-* seaborn
-* colour
-* pytz
-* requests
 
-Reference commands: sudo pip3 install numpy pandas scipy scikit-learn tensorflow networkx==1.10 beautifulsoup4 lxml matplotlib seaborn colour pytz requests
-
-## Result Visualization
-temporary link: [http://lemon.chiaolu.me/](http://lemon.chiaolu.me/)
+Reference commands: sudo pip3 install numpy pandas scipy scikit-learn tensorflow networkx==1.11 matplotlib 
